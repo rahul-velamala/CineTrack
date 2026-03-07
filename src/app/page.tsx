@@ -24,7 +24,7 @@ export default function PasscodePage() {
     e.preventDefault();
     const passcode = process.env.NEXT_PUBLIC_PASSCODE || "2580";
     if (code === passcode) {
-      login();
+      login(code);
       router.push("/home");
     } else {
       setError("Invalid passcode");

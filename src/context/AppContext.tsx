@@ -1,6 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
 
 export interface Movie {
   imdbID: string;
@@ -19,7 +21,7 @@ export interface Movie {
 
 interface AppContextType {
   isAuthenticated: boolean;
-  login: () => void;
+  login: (code: string) => void;
   logout: () => void;
   watchlist: Movie[];
   watched: Movie[];
@@ -29,52 +31,99 @@ interface AppContextType {
   removeFromWatched: (id: string) => void;
   isInWatchlist: (id: string) => boolean;
   isInWatched: (id: string) => boolean;
+  syncing: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passcode, setPasscode] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<Movie[]>([]);
   const [watched, setWatched] = useState<Movie[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  // Hydrate from storage on mount
+  // Track whether updates are from Firestore (to avoid write-back loops)
+  const isRemoteUpdate = useRef(false);
+  // Track if initial load from Firestore is done
+  const firestoreLoaded = useRef(false);
+
+  // Hydrate auth from sessionStorage on mount
   useEffect(() => {
     const auth = sessionStorage.getItem("cinetrack_auth");
-    if (auth === "true") setIsAuthenticated(true);
-
-    const savedWatchlist = localStorage.getItem("cinetrack_watchlist");
-    if (savedWatchlist) {
-      try { setWatchlist(JSON.parse(savedWatchlist)); } catch { /* ignore */ }
+    const savedCode = sessionStorage.getItem("cinetrack_passcode");
+    if (auth === "true" && savedCode) {
+      setIsAuthenticated(true);
+      setPasscode(savedCode);
     }
-
-    const savedWatched = localStorage.getItem("cinetrack_watched");
-    if (savedWatched) {
-      try { setWatched(JSON.parse(savedWatched)); } catch { /* ignore */ }
-    }
-
     setHydrated(true);
   }, []);
 
-  // Persist watchlist
+  // Subscribe to Firestore real-time updates when authenticated
   useEffect(() => {
-    if (hydrated) localStorage.setItem("cinetrack_watchlist", JSON.stringify(watchlist));
-  }, [watchlist, hydrated]);
+    if (!passcode) return;
 
-  // Persist watched
+    const docRef = doc(db, "users", passcode);
+    setSyncing(true);
+
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          isRemoteUpdate.current = true;
+          if (data.watchlist) setWatchlist(data.watchlist);
+          if (data.watched) setWatched(data.watched);
+          // Small delay to let state settle before allowing local writes
+          setTimeout(() => {
+            isRemoteUpdate.current = false;
+          }, 100);
+        }
+        firestoreLoaded.current = true;
+        setSyncing(false);
+      },
+      (error) => {
+        console.error("Firestore sync error:", error);
+        setSyncing(false);
+        // Fall back to localStorage
+        const savedWatchlist = localStorage.getItem("cinetrack_watchlist");
+        if (savedWatchlist) {
+          try { setWatchlist(JSON.parse(savedWatchlist)); } catch { /* ignore */ }
+        }
+        const savedWatched = localStorage.getItem("cinetrack_watched");
+        if (savedWatched) {
+          try { setWatched(JSON.parse(savedWatched)); } catch { /* ignore */ }
+        }
+        firestoreLoaded.current = true;
+      }
+    );
+
+    return () => unsubscribe();
+  }, [passcode]);
+
+  // Sync watchlist to Firestore on changes (skip if remote update)
   useEffect(() => {
-    if (hydrated) localStorage.setItem("cinetrack_watched", JSON.stringify(watched));
-  }, [watched, hydrated]);
+    if (!passcode || !firestoreLoaded.current || isRemoteUpdate.current) return;
+    const docRef = doc(db, "users", passcode);
+    setDoc(docRef, { watchlist, watched }, { merge: true }).catch(console.error);
+    // Also keep localStorage as fallback
+    localStorage.setItem("cinetrack_watchlist", JSON.stringify(watchlist));
+    localStorage.setItem("cinetrack_watched", JSON.stringify(watched));
+  }, [watchlist, watched, passcode]);
 
-  const login = useCallback(() => {
+  const login = useCallback((code: string) => {
     setIsAuthenticated(true);
+    setPasscode(code);
     sessionStorage.setItem("cinetrack_auth", "true");
+    sessionStorage.setItem("cinetrack_passcode", code);
   }, []);
 
   const logout = useCallback(() => {
     setIsAuthenticated(false);
+    setPasscode(null);
     sessionStorage.removeItem("cinetrack_auth");
+    sessionStorage.removeItem("cinetrack_passcode");
   }, []);
 
   const addToWatchlist = useCallback((movie: Movie) => {
@@ -125,6 +174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         removeFromWatched,
         isInWatchlist,
         isInWatched,
+        syncing,
       }}
     >
       {children}
