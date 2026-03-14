@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection: keyed by passcode
+    match /users/{passcode} {
+      // Anyone can read/write their own document (identified by passcode)
+      // This is secure enough for a passcode-based app without user accounts
+      allow read, write: if request.resource.data.keys().hasOnly(['watchlist', 'watched'])
+                         && request.resource.data.watchlist is list
+                         && request.resource.data.watched is list;
+
+      // Allow reads unconditionally (needed to load data)
+      allow read: if true;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -3,18 +3,63 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { searchMulti, TMDBSearchResult, posterUrl } from "@/lib/tmdb";
 
-interface SearchResult {
-  imdbID: string;
-  Title: string;
-  Year: string;
-  Poster: string;
-  Type: string;
+interface DisplayResult {
+  id: number;
+  title: string;
+  year: string;
+  poster: string;
+  rating: string;
+  type: "movie" | "person";
+  subtitle?: string;
 }
 
-export default function SearchBar() {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+function flattenResults(raw: TMDBSearchResult[]): DisplayResult[] {
+  const results: DisplayResult[] = [];
+  for (const item of raw) {
+    if (item.media_type === "movie" && item.title) {
+      results.push({
+        id: item.id,
+        title: item.title,
+        year: item.release_date?.split("-")[0] || "",
+        poster: posterUrl(item.poster_path, "w92"),
+        rating: item.vote_average ? item.vote_average.toFixed(1) : "",
+        type: "movie",
+      });
+    } else if (item.media_type === "person" && item.known_for) {
+      // Show the person's known movies as results
+      for (const kf of item.known_for) {
+        if (kf.media_type === "movie" && kf.title) {
+          results.push({
+            id: kf.id,
+            title: kf.title,
+            year: kf.release_date?.split("-")[0] || "",
+            poster: posterUrl(kf.poster_path, "w92"),
+            rating: kf.vote_average ? kf.vote_average.toFixed(1) : "",
+            type: "movie",
+            subtitle: `via ${item.name}`,
+          });
+        }
+      }
+    }
+  }
+  // Deduplicate by id
+  const seen = new Set<number>();
+  return results.filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  }).slice(0, 10);
+}
+
+interface SearchBarProps {
+  initialQuery?: string;
+}
+
+export default function SearchBar({ initialQuery }: SearchBarProps) {
+  const [query, setQuery] = useState(initialQuery || "");
+  const [results, setResults] = useState<DisplayResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -23,25 +68,26 @@ export default function SearchBar() {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
-  const searchMovies = useCallback(async (searchQuery: string) => {
+  // If initialQuery is provided, trigger search on mount
+  useEffect(() => {
+    if (initialQuery && initialQuery.length >= 2) {
+      doSearch(initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const doSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setResults([]);
       setShowDropdown(false);
       return;
     }
-
     setIsLoading(true);
     try {
-      const apiKey = process.env.NEXT_PUBLIC_OMDB_API_KEY;
-      const res = await fetch(`https://www.omdbapi.com/?apikey=${apiKey}&s=${encodeURIComponent(searchQuery)}&type=movie`);
-      const data = await res.json();
-      if (data.Response === "True" && data.Search) {
-        setResults(data.Search.slice(0, 8));
-        setShowDropdown(true);
-      } else {
-        setResults([]);
-        setShowDropdown(true);
-      }
+      const raw = await searchMulti(searchQuery);
+      const flat = flattenResults(raw);
+      setResults(flat);
+      setShowDropdown(true);
     } catch {
       setResults([]);
     } finally {
@@ -56,11 +102,11 @@ export default function SearchBar() {
       setShowDropdown(false);
       return;
     }
-    searchTimeoutRef.current = setTimeout(() => searchMovies(query), 350);
+    searchTimeoutRef.current = setTimeout(() => doSearch(query), 300);
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
-  }, [query, searchMovies]);
+  }, [query, doSearch]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -73,10 +119,10 @@ export default function SearchBar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (imdbID: string) => {
+  const handleSelect = (id: number) => {
     setShowDropdown(false);
     setQuery("");
-    router.push(`/movie/${imdbID}`);
+    router.push(`/movie/${id}`);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -89,7 +135,7 @@ export default function SearchBar() {
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : results.length - 1));
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
-      handleSelect(results[selectedIndex].imdbID);
+      handleSelect(results[selectedIndex].id);
     } else if (e.key === "Escape") {
       setShowDropdown(false);
     }
@@ -114,7 +160,7 @@ export default function SearchBar() {
           }}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
           onKeyDown={handleKeyDown}
-          placeholder="Search movies... (Bollywood, Hollywood & more)"
+          placeholder="Search movies, actors... (Bollywood, Hollywood & more)"
           className="w-full pl-12 pr-12 py-4 rounded-2xl bg-cinema-surface border border-cinema-border text-cinema-text placeholder:text-cinema-muted/60 text-base focus:outline-none focus:border-cinema-purple focus:ring-1 focus:ring-cinema-purple/50 transition-all"
           autoComplete="off"
         />
@@ -140,41 +186,49 @@ export default function SearchBar() {
         <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl glass-strong overflow-hidden shadow-2xl shadow-black/50 animate-slide-down z-50">
           {results.length > 0 ? (
             <div className="max-h-[480px] overflow-y-auto">
-              {results.map((movie, index) => {
-                const posterSrc = movie.Poster && movie.Poster !== "N/A" ? movie.Poster : "/no-poster.svg";
-                return (
-                  <button
-                    key={movie.imdbID}
-                    onClick={() => handleSelect(movie.imdbID)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer ${
-                      index === selectedIndex
-                        ? "bg-cinema-purple/15"
-                        : "hover:bg-white/5"
-                    } ${index !== results.length - 1 ? "border-b border-cinema-border/30" : ""}`}
-                  >
-                    <div className="relative w-10 h-14 rounded-md overflow-hidden bg-cinema-surface flex-shrink-0">
-                      <Image
-                        src={posterSrc}
-                        alt={movie.Title}
-                        fill
-                        sizes="40px"
-                        className="object-cover"
-                        unoptimized
-                      />
+              {results.map((item, index) => (
+                <button
+                  key={`${item.id}-${index}`}
+                  onClick={() => handleSelect(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer ${
+                    index === selectedIndex
+                      ? "bg-cinema-purple/15"
+                      : "hover:bg-white/5"
+                  } ${index !== results.length - 1 ? "border-b border-cinema-border/30" : ""}`}
+                >
+                  <div className="relative w-10 h-14 rounded-md overflow-hidden bg-cinema-surface flex-shrink-0">
+                    <Image
+                      src={item.poster}
+                      alt={item.title}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-cinema-text truncate">{item.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-cinema-muted mt-0.5">
+                      {item.year && <span>{item.year}</span>}
+                      {item.rating && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-cinema-border" />
+                          <span className="text-cinema-gold">★ {item.rating}</span>
+                        </>
+                      )}
+                      {item.subtitle && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-cinema-border" />
+                          <span className="text-cinema-purple">{item.subtitle}</span>
+                        </>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-cinema-text truncate">{movie.Title}</p>
-                      <div className="flex items-center gap-2 text-xs text-cinema-muted mt-0.5">
-                        <span>{movie.Year}</span>
-                        <span className="capitalize">{movie.Type}</span>
-                      </div>
-                    </div>
-                    <svg className="w-4 h-4 text-cinema-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                );
-              })}
+                  </div>
+                  <svg className="w-4 h-4 text-cinema-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
             </div>
           ) : (
             <div className="px-4 py-8 text-center text-cinema-muted text-sm">

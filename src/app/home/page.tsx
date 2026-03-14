@@ -1,17 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import AuthGuard from "@/components/AuthGuard";
 
 export default function HomePage() {
+  const [searchKey, setSearchKey] = useState(0);
+  const [initialQuery, setInitialQuery] = useState("");
+
+  const handleChipClick = (title: string) => {
+    setInitialQuery(title);
+    setSearchKey((k) => k + 1); // force remount SearchBar with new query
+  };
+
   return (
     <AuthGuard>
       <Navbar />
       <main className="min-h-screen pt-16">
         {/* Hero Section */}
         <section className="relative pt-20 pb-16 px-4">
-          {/* Background glow */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-cinema-purple/10 rounded-full blur-[120px]" />
           </div>
@@ -25,22 +33,23 @@ export default function HomePage() {
                 Your Movies
               </h1>
               <p className="text-cinema-muted text-lg max-w-lg mx-auto">
-                Search any movie, watch trailers, and manage your personal watchlist — all in one place.
+                Search any movie or actor, watch trailers, and manage your personal watchlist — all in one place.
               </p>
             </div>
 
-            <SearchBar />
+            <SearchBar key={searchKey} initialQuery={initialQuery} />
 
-            {/* Quick suggestions */}
+            {/* Clickable suggestion chips */}
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <span className="text-cinema-muted">Try:</span>
-              {["Inception", "3 Idiots", "Interstellar", "Dangal", "The Dark Knight"].map((title) => (
-                <span
+              {["Inception", "3 Idiots", "Interstellar", "Dangal", "Shah Rukh Khan", "Leonardo DiCaprio"].map((title) => (
+                <button
                   key={title}
-                  className="px-3 py-1.5 rounded-full bg-cinema-surface border border-cinema-border/50 text-cinema-muted hover:text-cinema-text hover:border-cinema-purple/50 transition-all cursor-default"
+                  onClick={() => handleChipClick(title)}
+                  className="px-3 py-1.5 rounded-full bg-cinema-surface border border-cinema-border/50 text-cinema-muted hover:text-cinema-text hover:border-cinema-purple/50 hover:bg-cinema-purple/10 transition-all cursor-pointer"
                 >
                   {title}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -50,7 +59,7 @@ export default function HomePage() {
         <section className="max-w-5xl mx-auto px-4 pb-16">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { icon: "🔍", title: "Search", desc: "Find any Bollywood or Hollywood movie" },
+              { icon: "🔍", title: "Search", desc: "Find movies by title, actor, or even partial names" },
               { icon: "🎬", title: "Watch Trailers", desc: "Watch trailers right on the page" },
               { icon: "📋", title: "Track Movies", desc: "Save to watchlist or mark as watched" },
             ].map((feature) => (
