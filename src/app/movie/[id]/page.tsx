@@ -7,12 +7,14 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import AuthGuard from "@/components/AuthGuard";
 import { useApp } from "@/context/AppContext";
-import { getMovieDetails, tmdbDetailToMovie, getTrailerKey, posterUrl, backdropUrl, TMDBMovieDetail } from "@/lib/tmdb";
+import { getMovieDetails, getMovieVideos, tmdbDetailToMovie, getTrailerKey, findTrailerKey, posterUrl, backdropUrl, TMDBMovieDetail } from "@/lib/tmdb";
 
 export default function MovieDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [detail, setDetail] = useState<TMDBMovieDetail | null>(null);
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  const [trailerLoading, setTrailerLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const { addToWatchlist, markAsWatched, isInWatchlist, isInWatched, removeFromWatchlist, removeFromWatched } = useApp();
 
@@ -21,10 +23,22 @@ export default function MovieDetailPage() {
       try {
         const data = await getMovieDetails(id);
         setDetail(data);
+
+        // Try to get trailer from appended videos first
+        if (data) {
+          let key = getTrailerKey(data);
+          if (!key) {
+            // Fallback: fetch videos separately (catches more languages)
+            const allVideos = await getMovieVideos(id);
+            key = findTrailerKey(allVideos);
+          }
+          setTrailerKey(key);
+        }
       } catch {
         // ignore
       } finally {
         setLoading(false);
+        setTrailerLoading(false);
       }
     }
     if (id) fetchMovie();
@@ -64,7 +78,6 @@ export default function MovieDetailPage() {
   }
 
   const movie = tmdbDetailToMovie(detail);
-  const trailerKey = getTrailerKey(detail);
   const poster = posterUrl(detail.poster_path, "w780");
   const backdrop = backdropUrl(detail.backdrop_path);
   const inWatchlist = isInWatchlist(movie.imdbID);
@@ -200,7 +213,9 @@ export default function MovieDetailPage() {
           <h2 className="text-lg font-semibold font-[family-name:var(--font-display)] mb-4 flex items-center gap-2">
             <span>🎥</span> Trailer
           </h2>
-          {trailerKey ? (
+          {trailerLoading ? (
+            <div className="w-full aspect-video rounded-2xl skeleton" />
+          ) : trailerKey ? (
             <div className="w-full aspect-video rounded-2xl overflow-hidden border border-cinema-border/30 shadow-2xl">
               <iframe
                 src={`https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1`}

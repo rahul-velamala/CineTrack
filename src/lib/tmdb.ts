@@ -90,10 +90,20 @@ export async function searchMovies(query: string): Promise<TMDBSearchResult[]> {
 
 export async function getMovieDetails(id: string | number): Promise<TMDBMovieDetail | null> {
   const res = await fetch(
-    `${BASE}/movie/${id}?api_key=${apiKey()}&append_to_response=credits,videos`
+    `${BASE}/movie/${id}?api_key=${apiKey()}&append_to_response=credits,videos&include_video_language=en,hi,te,ta,ml,null`
   );
   if (!res.ok) return null;
   return res.json();
+}
+
+// Fetch videos separately across ALL languages as fallback
+export async function getMovieVideos(id: string | number): Promise<{ key: string; site: string; type: string; name: string }[]> {
+  // Try with no language filter to get everything
+  const res = await fetch(
+    `${BASE}/movie/${id}/videos?api_key=${apiKey()}`
+  );
+  const data = await res.json();
+  return data.results || [];
 }
 
 // --- Conversion to our Movie interface ---
@@ -131,13 +141,16 @@ export function tmdbDetailToMovie(t: TMDBMovieDetail): Movie {
   };
 }
 
-// --- Get trailer YouTube ID from TMDB videos ---
+// --- Get trailer YouTube ID from videos array ---
 
-export function getTrailerKey(detail: TMDBMovieDetail): string | null {
-  const vids = detail.videos?.results || [];
-  // Prefer official trailer
+export function findTrailerKey(vids: { key: string; site: string; type: string; name: string }[]): string | null {
+  // Prefer official trailer, then teaser, then any YouTube video
   const trailer = vids.find((v) => v.site === "YouTube" && v.type === "Trailer")
     || vids.find((v) => v.site === "YouTube" && v.type === "Teaser")
     || vids.find((v) => v.site === "YouTube");
   return trailer?.key || null;
+}
+
+export function getTrailerKey(detail: TMDBMovieDetail): string | null {
+  return findTrailerKey(detail.videos?.results || []);
 }
