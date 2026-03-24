@@ -1,17 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
+import MovieCard from "@/components/MovieCard";
 import AuthGuard from "@/components/AuthGuard";
+import { getTrending, tmdbToMovie, TMDBSearchResult } from "@/lib/tmdb";
 
 export default function HomePage() {
   const [searchKey, setSearchKey] = useState(0);
   const [initialQuery, setInitialQuery] = useState("");
+  const [trending, setTrending] = useState<TMDBSearchResult[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+
+  useEffect(() => {
+    getTrending("week")
+      .then((results) => setTrending(results.slice(0, 10)))
+      .catch(() => {})
+      .finally(() => setTrendingLoading(false));
+  }, []);
 
   const handleChipClick = (title: string) => {
     setInitialQuery(title);
-    setSearchKey((k) => k + 1); // force remount SearchBar with new query
+    setSearchKey((k) => k + 1);
   };
 
   return (
@@ -56,7 +67,7 @@ export default function HomePage() {
         </section>
 
         {/* Feature hints */}
-        <section className="max-w-5xl mx-auto px-4 pb-16">
+        <section className="max-w-5xl mx-auto px-4 pb-12">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { icon: "🔍", title: "Search", desc: "Find movies by title, actor, or even partial names" },
@@ -73,6 +84,33 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Trending Movies */}
+        <section className="max-w-6xl mx-auto px-4 pb-16">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold font-[family-name:var(--font-display)] flex items-center gap-2">
+              <span>🔥</span> Trending This Week
+            </h2>
+          </div>
+
+          {trendingLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="aspect-[2/3] rounded-xl skeleton" />
+              ))}
+            </div>
+          ) : trending.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {trending.map((movie, index) => (
+                <div key={movie.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                  <MovieCard movie={tmdbToMovie(movie)} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-cinema-muted text-sm text-center py-8">Could not load trending movies.</p>
+          )}
         </section>
       </main>
     </AuthGuard>

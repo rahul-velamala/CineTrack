@@ -1,0 +1,34 @@
+check the already available sites with same usecases.
+Hit movie recommendations 
+Trending Movies 
+Release status
+direct ott links
+watch together options where people chat and talk everyone should have an account
+try to do all of it at free of cost or money which can be earned through patreon or adds
+
+
+and correct the first page selection bug there is try option right if we click on it then it should add it in to the search bar and search for the movie 
+
+and search using first 2 or three letters
+
+search using actors names 
+
+search even if the spelling is wrong
+
+change to tmbd database if its free and better
+
+
+adding google login
+scale in hosting
+social with friends
+social where people can chat & talk
+social where people can watch movies together
+
+
+extend the same features for books
+
+I should have a feature such that i have proper analytics of what is used by the users and from which locations
+
+should be resistant to attacks
+
+will try with the free tire versions and then if the reponse is good can extend to paid versions 

@@ -96,6 +96,49 @@ export async function getMovieDetails(id: string | number): Promise<TMDBMovieDet
   return res.json();
 }
 
+// --- Trending ---
+
+export async function getTrending(timeWindow: "day" | "week" = "week"): Promise<TMDBSearchResult[]> {
+  const res = await fetch(
+    `${BASE}/trending/movie/${timeWindow}?api_key=${apiKey()}&page=1`
+  );
+  const data = await res.json();
+  return data.results || [];
+}
+
+// --- Recommendations ---
+
+export async function getRecommendations(id: string | number): Promise<TMDBSearchResult[]> {
+  const res = await fetch(
+    `${BASE}/movie/${id}/recommendations?api_key=${apiKey()}&page=1`
+  );
+  const data = await res.json();
+  return (data.results || []).slice(0, 10);
+}
+
+// --- Watch Providers (OTT links) ---
+
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
+export interface WatchProviderData {
+  link?: string;
+  flatrate?: WatchProvider[];  // subscription streaming
+  rent?: WatchProvider[];
+  buy?: WatchProvider[];
+}
+
+export async function getWatchProviders(id: string | number, region: string = "IN"): Promise<WatchProviderData | null> {
+  const res = await fetch(
+    `${BASE}/movie/${id}/watch/providers?api_key=${apiKey()}`
+  );
+  const data = await res.json();
+  return data.results?.[region] || data.results?.["US"] || null;
+}
+
 // Fetch videos separately across ALL languages as fallback
 export async function getMovieVideos(id: string | number): Promise<{ key: string; site: string; type: string; name: string }[]> {
   // Try with no language filter to get everything
