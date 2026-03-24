@@ -15,6 +15,37 @@ import {
   TMDBMovieDetail, TMDBSearchResult, WatchProviderData,
 } from "@/lib/tmdb";
 
+// Deep link map for popular streaming providers
+const PROVIDER_LINKS: Record<string, (q: string) => string> = {
+  "Netflix":            (q) => `https://www.netflix.com/search?q=${encodeURIComponent(q)}`,
+  "Amazon Prime Video": (q) => `https://www.primevideo.com/search?phrase=${encodeURIComponent(q)}`,
+  "JioHotstar":         (q) => `https://www.jiohotstar.com/search?q=${encodeURIComponent(q)}`,
+  "Hotstar":            (q) => `https://www.hotstar.com/in/search?q=${encodeURIComponent(q)}`,
+  "Disney Plus":        (q) => `https://www.disneyplus.com/search?q=${encodeURIComponent(q)}`,
+  "Google Play Movies": (q) => `https://play.google.com/store/search?q=${encodeURIComponent(q)}&c=movies`,
+  "YouTube":            (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " full movie")}`,
+  "Apple TV":           (q) => `https://tv.apple.com/search?term=${encodeURIComponent(q)}`,
+  "Apple TV Plus":      (q) => `https://tv.apple.com/search?term=${encodeURIComponent(q)}`,
+  "Zee5":               (q) => `https://www.zee5.com/search?q=${encodeURIComponent(q)}`,
+  "SonyLIV":            (q) => `https://www.sonyliv.com/search?searchTerm=${encodeURIComponent(q)}`,
+  "Jio Cinema":         (q) => `https://www.jiocinema.com/search/${encodeURIComponent(q)}`,
+  "Voot":               (q) => `https://www.voot.com/search?q=${encodeURIComponent(q)}`,
+  "MX Player":          (q) => `https://www.mxplayer.in/search?q=${encodeURIComponent(q)}`,
+  "Lionsgate Play":     (q) => `https://www.lionsgateplay.com/search?q=${encodeURIComponent(q)}`,
+  "Mubi":               (q) => `https://mubi.com/en/search?query=${encodeURIComponent(q)}`,
+  "Hulu":               (q) => `https://www.hulu.com/search?q=${encodeURIComponent(q)}`,
+  "HBO Max":            (q) => `https://play.max.com/search?q=${encodeURIComponent(q)}`,
+  "Paramount Plus":     (q) => `https://www.paramountplus.com/search?q=${encodeURIComponent(q)}`,
+  "Peacock":            (q) => `https://www.peacocktv.com/search?q=${encodeURIComponent(q)}`,
+};
+
+function getProviderLink(providerName: string, movieTitle: string): string {
+  const builder = PROVIDER_LINKS[providerName];
+  if (builder) return builder(movieTitle);
+  // Fallback: Google search for "watch [movie] on [provider]"
+  return `https://www.google.com/search?q=${encodeURIComponent(`watch ${movieTitle} on ${providerName}`)}`;
+}
+
 export default function MovieDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -272,10 +303,11 @@ export default function MovieDetailPage() {
                   <p className="text-xs text-cinema-muted uppercase tracking-wider mb-3">Stream</p>
                   <div className="flex flex-wrap gap-3">
                     {streamOn.map((p) => (
-                      <div key={p.provider_id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cinema-surface border border-cinema-border/30">
+                      <a key={p.provider_id} href={getProviderLink(p.provider_name, movie.Title)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cinema-surface border border-cinema-border/30 hover:border-cinema-purple/40 hover:bg-cinema-purple/5 transition-all">
                         <Image src={`https://image.tmdb.org/t/p/w45${p.logo_path}`} alt={p.provider_name} width={28} height={28} className="rounded-md" unoptimized />
                         <span className="text-sm text-cinema-text">{p.provider_name}</span>
-                      </div>
+                        <svg className="w-3.5 h-3.5 text-cinema-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -285,10 +317,11 @@ export default function MovieDetailPage() {
                   <p className="text-xs text-cinema-muted uppercase tracking-wider mb-3">Rent</p>
                   <div className="flex flex-wrap gap-3">
                     {rentOn.map((p) => (
-                      <div key={p.provider_id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cinema-surface border border-cinema-border/30">
+                      <a key={p.provider_id} href={getProviderLink(p.provider_name, movie.Title)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cinema-surface border border-cinema-border/30 hover:border-cinema-purple/40 hover:bg-cinema-purple/5 transition-all">
                         <Image src={`https://image.tmdb.org/t/p/w45${p.logo_path}`} alt={p.provider_name} width={28} height={28} className="rounded-md" unoptimized />
                         <span className="text-sm text-cinema-text">{p.provider_name}</span>
-                      </div>
+                        <svg className="w-3.5 h-3.5 text-cinema-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -298,10 +331,11 @@ export default function MovieDetailPage() {
                   <p className="text-xs text-cinema-muted uppercase tracking-wider mb-3">Buy</p>
                   <div className="flex flex-wrap gap-3">
                     {buyOn.map((p) => (
-                      <div key={p.provider_id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cinema-surface border border-cinema-border/30">
+                      <a key={p.provider_id} href={getProviderLink(p.provider_name, movie.Title)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cinema-surface border border-cinema-border/30 hover:border-cinema-purple/40 hover:bg-cinema-purple/5 transition-all">
                         <Image src={`https://image.tmdb.org/t/p/w45${p.logo_path}`} alt={p.provider_name} width={28} height={28} className="rounded-md" unoptimized />
                         <span className="text-sm text-cinema-text">{p.provider_name}</span>
-                      </div>
+                        <svg className="w-3.5 h-3.5 text-cinema-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
                     ))}
                   </div>
                 </div>
