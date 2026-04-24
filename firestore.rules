@@ -2,19 +2,34 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users collection: keyed by passcode
-    match /users/{passcode} {
-      // Anyone can read/write their own document (identified by passcode)
-      // This is secure enough for a passcode-based app without user accounts
-      allow read, write: if request.resource.data.keys().hasOnly(['watchlist', 'watched'])
-                         && request.resource.data.watchlist is list
-                         && request.resource.data.watched is list;
 
-      // Allow reads unconditionally (needed to load data)
+    // User profiles + watchlist/watched data. Keyed by Firebase Auth uid.
+    // Publicly readable (for friends, creator lists, shared watchlists).
+    // Writable only by the owner.
+    match /users/{uid} {
       allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if request.auth != null && request.auth.uid == uid;
+
+      // Sub-collections scoped to owner unless otherwise noted.
+      match /{sub=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
-    // Deny everything else
+    // Handle registry: handles/{handle} -> { uid, claimedAt }
+    // Publicly readable for @handle → uid resolution.
+    // Writable only when creating/releasing your own handle.
+    match /handles/{handle} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // Default deny.
     match /{document=**} {
       allow read, write: if false;
     }

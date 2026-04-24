@@ -1,6 +1,20 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import {
+  claimHandle as claimHandleFn,
+  ensureUserDoc,
+  mergeLocalIntoFirestore,
+  type UserProfile,
+} from "@/lib/userStore";
+import {
+  signInGoogle as doSignInGoogle,
+  sendEmailLink as doSendEmailLink,
+  signOut as doSignOut,
+} from "@/lib/auth";
 
 export type MediaType = "movie" | "tv";
 
@@ -23,6 +37,7 @@ export interface Movie {
 }
 
 interface AppContextType {
+  // data
   watchlist: Movie[];
   watched: Movie[];
   addToWatchlist: (movie: Movie) => void;
@@ -31,6 +46,16 @@ interface AppContextType {
   removeFromWatched: (id: string) => void;
   isInWatchlist: (id: string) => boolean;
   isInWatched: (id: string) => boolean;
+  // auth
+  user: User | null;
+  profile: UserProfile | null;
+  authLoading: boolean;
+  syncing: boolean;
+  needsHandle: boolean;
+  signInGoogle: () => Promise<void>;
+  sendEmailLink: (email: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  claimHandle: (raw: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -60,21 +85,111 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [watched, setWatched] = useState<Movie[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const isRemoteUpdate = useRef(false);
+  const firestoreLoaded = useRef(false);
+  const migrated = useRef(false);
+
+  // Hydrate from localStorage on mount
   useEffect(() => {
     setWatchlist(loadList(WATCHLIST_KEY));
     setWatched(loadList(WATCHED_KEY));
     setHydrated(true);
   }, []);
 
+  // Firebase Auth subscription
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      setUser(fbUser);
+      setAuthLoading(false);
+      if (!fbUser) {
+        setProfile(null);
+        firestoreLoaded.current = false;
+        migrated.current = false;
+        return;
+      }
+      try {
+        const p = await ensureUserDoc(fbUser);
+        setProfile(p);
+      } catch (err) {
+        console.error("ensureUserDoc failed", err);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // When user signs in, migrate local lists into Firestore (one-time), then subscribe
+  useEffect(() => {
+    if (!user) return;
+    let unsub: (() => void) | undefined;
+
+    async function setup() {
+      setSyncing(true);
+      try {
+        if (!migrated.current) {
+          const localWatchlist = loadList(WATCHLIST_KEY);
+          const localWatched = loadList(WATCHED_KEY);
+          await mergeLocalIntoFirestore(user!.uid, localWatchlist, localWatched);
+          migrated.current = true;
+        }
+      } catch (err) {
+        console.error("migration failed", err);
+      }
+
+      const ref = doc(db, "users", user!.uid);
+      unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as { watchlist?: Movie[]; watched?: Movie[]; handle?: string; displayName?: string; photoURL?: string; email?: string; verified?: boolean };
+            isRemoteUpdate.current = true;
+            setWatchlist(Array.isArray(data.watchlist) ? data.watchlist.map(normalize) : []);
+            setWatched(Array.isArray(data.watched) ? data.watched.map(normalize) : []);
+            setProfile((prev) => ({
+              uid: user!.uid,
+              handle: data.handle,
+              displayName: data.displayName ?? prev?.displayName,
+              photoURL: data.photoURL ?? prev?.photoURL,
+              email: data.email ?? prev?.email,
+              verified: data.verified,
+            }));
+            setTimeout(() => { isRemoteUpdate.current = false; }, 50);
+          }
+          firestoreLoaded.current = true;
+          setSyncing(false);
+        },
+        (err) => {
+          console.error("Firestore snapshot error", err);
+          setSyncing(false);
+        }
+      );
+    }
+    setup();
+
+    return () => {
+      if (unsub) unsub();
+      firestoreLoaded.current = false;
+    };
+  }, [user]);
+
+  // Persist changes: Firestore if authed, localStorage always as mirror
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
-  }, [watchlist, hydrated]);
+    if (!user || !firestoreLoaded.current || isRemoteUpdate.current) return;
+    setDoc(doc(db, "users", user.uid), { watchlist }, { merge: true }).catch(console.error);
+  }, [watchlist, hydrated, user]);
 
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem(WATCHED_KEY, JSON.stringify(watched));
-  }, [watched, hydrated]);
+    if (!user || !firestoreLoaded.current || isRemoteUpdate.current) return;
+    setDoc(doc(db, "users", user.uid), { watched }, { merge: true }).catch(console.error);
+  }, [watched, hydrated, user]);
 
   const addToWatchlist = useCallback((movie: Movie) => {
     const m = normalize(movie);
@@ -98,6 +213,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const isInWatchlist = useCallback((id: string) => watchlist.some((m) => m.imdbID === id), [watchlist]);
   const isInWatched = useCallback((id: string) => watched.some((m) => m.imdbID === id), [watched]);
 
+  const signInGoogle = useCallback(async () => {
+    await doSignInGoogle();
+  }, []);
+
+  const sendEmailLink = useCallback(async (email: string) => {
+    await doSendEmailLink(email);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await doSignOut();
+  }, []);
+
+  const claimHandle = useCallback(async (raw: string) => {
+    if (!user) return { ok: false as const, error: "Not signed in." };
+    const res = await claimHandleFn(user.uid, raw);
+    if (res.ok) {
+      const handle = raw.trim().toLowerCase().replace(/^@/, "");
+      setProfile((prev) => (prev ? { ...prev, handle } : { uid: user.uid, handle }));
+    }
+    return res;
+  }, [user]);
+
+  const needsHandle = !!user && !!profile && !profile.handle;
+
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-[#08080f] flex items-center justify-center">
@@ -117,6 +256,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         removeFromWatched,
         isInWatchlist,
         isInWatched,
+        user,
+        profile,
+        authLoading,
+        syncing,
+        needsHandle,
+        signInGoogle,
+        sendEmailLink,
+        signOut,
+        claimHandle,
       }}
     >
       {children}
