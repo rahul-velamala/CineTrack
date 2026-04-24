@@ -2,7 +2,6 @@
 
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
-import AuthGuard from "@/components/AuthGuard";
 import { useApp } from "@/context/AppContext";
 import Link from "next/link";
 
@@ -10,7 +9,7 @@ export default function WatchedPage() {
   const { watched } = useApp();
 
   return (
-    <AuthGuard>
+    <>
       <Navbar />
       <main className="min-h-screen pt-16">
         <div className="max-w-6xl mx-auto px-4 py-12">
@@ -50,6 +49,6 @@ export default function WatchedPage() {
           )}
         </div>
       </main>
-    </AuthGuard>
+    </>
   );
 }

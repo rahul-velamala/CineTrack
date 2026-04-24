@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import MovieCard from "@/components/MovieCard";
-import AuthGuard from "@/components/AuthGuard";
 import { getTrending, tmdbToMovie, TMDBSearchResult } from "@/lib/tmdb";
 
 export default function HomePage() {
@@ -26,7 +25,7 @@ export default function HomePage() {
   };
 
   return (
-    <AuthGuard>
+    <>
       <Navbar />
       <main className="min-h-screen pt-16">
         {/* Hero Section */}
@@ -113,6 +112,6 @@ export default function HomePage() {
           )}
         </section>
       </main>
-    </AuthGuard>
+    </>
   );
 }

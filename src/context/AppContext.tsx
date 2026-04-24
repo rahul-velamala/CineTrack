@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { db } from "@/lib/firebase";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+
+export type MediaType = "movie" | "tv";
 
 export interface Movie {
   imdbID: string;
@@ -17,12 +17,12 @@ export interface Movie {
   Director?: string;
   Actors?: string;
   Type?: string;
+  mediaType?: MediaType;
+  Seasons?: number;
+  Episodes?: number;
 }
 
 interface AppContextType {
-  isAuthenticated: boolean;
-  login: (code: string) => void;
-  logout: () => void;
   watchlist: Movie[];
   watched: Movie[];
   addToWatchlist: (movie: Movie) => void;
@@ -31,106 +31,54 @@ interface AppContextType {
   removeFromWatched: (id: string) => void;
   isInWatchlist: (id: string) => boolean;
   isInWatched: (id: string) => boolean;
-  syncing: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const WATCHLIST_KEY = "cinetrack_watchlist";
+const WATCHED_KEY = "cinetrack_watched";
+
+function normalize(m: Movie): Movie {
+  return { ...m, mediaType: m.mediaType ?? "movie" };
+}
+
+function loadList(key: string): Movie[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalize);
+  } catch {
+    return [];
+  }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passcode, setPasscode] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<Movie[]>([]);
   const [watched, setWatched] = useState<Movie[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
-  // Track whether updates are from Firestore (to avoid write-back loops)
-  const isRemoteUpdate = useRef(false);
-  // Track if initial load from Firestore is done
-  const firestoreLoaded = useRef(false);
-
-  // Hydrate auth from sessionStorage on mount
   useEffect(() => {
-    const auth = sessionStorage.getItem("cinetrack_auth");
-    const savedCode = sessionStorage.getItem("cinetrack_passcode");
-    if (auth === "true" && savedCode) {
-      setIsAuthenticated(true);
-      setPasscode(savedCode);
-    }
+    setWatchlist(loadList(WATCHLIST_KEY));
+    setWatched(loadList(WATCHED_KEY));
     setHydrated(true);
   }, []);
 
-  // Subscribe to Firestore real-time updates when authenticated
   useEffect(() => {
-    if (!passcode) return;
+    if (!hydrated) return;
+    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+  }, [watchlist, hydrated]);
 
-    const docRef = doc(db, "users", passcode);
-    setSyncing(true);
-
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          isRemoteUpdate.current = true;
-          if (data.watchlist) setWatchlist(data.watchlist);
-          if (data.watched) setWatched(data.watched);
-          // Small delay to let state settle before allowing local writes
-          setTimeout(() => {
-            isRemoteUpdate.current = false;
-          }, 100);
-        }
-        firestoreLoaded.current = true;
-        setSyncing(false);
-      },
-      (error) => {
-        console.error("Firestore sync error:", error);
-        setSyncing(false);
-        // Fall back to localStorage
-        const savedWatchlist = localStorage.getItem("cinetrack_watchlist");
-        if (savedWatchlist) {
-          try { setWatchlist(JSON.parse(savedWatchlist)); } catch { /* ignore */ }
-        }
-        const savedWatched = localStorage.getItem("cinetrack_watched");
-        if (savedWatched) {
-          try { setWatched(JSON.parse(savedWatched)); } catch { /* ignore */ }
-        }
-        firestoreLoaded.current = true;
-      }
-    );
-
-    return () => unsubscribe();
-  }, [passcode]);
-
-  // Sync watchlist to Firestore on changes (skip if remote update)
   useEffect(() => {
-    if (!passcode || !firestoreLoaded.current || isRemoteUpdate.current) return;
-    const docRef = doc(db, "users", passcode);
-    setDoc(docRef, { watchlist, watched }, { merge: true }).catch(console.error);
-    // Also keep localStorage as fallback
-    localStorage.setItem("cinetrack_watchlist", JSON.stringify(watchlist));
-    localStorage.setItem("cinetrack_watched", JSON.stringify(watched));
-  }, [watchlist, watched, passcode]);
-
-  const login = useCallback((code: string) => {
-    setIsAuthenticated(true);
-    setPasscode(code);
-    sessionStorage.setItem("cinetrack_auth", "true");
-    sessionStorage.setItem("cinetrack_passcode", code);
-  }, []);
-
-  const logout = useCallback(() => {
-    setIsAuthenticated(false);
-    setPasscode(null);
-    sessionStorage.removeItem("cinetrack_auth");
-    sessionStorage.removeItem("cinetrack_passcode");
-  }, []);
+    if (!hydrated) return;
+    localStorage.setItem(WATCHED_KEY, JSON.stringify(watched));
+  }, [watched, hydrated]);
 
   const addToWatchlist = useCallback((movie: Movie) => {
-    setWatchlist((prev) => {
-      if (prev.some((m) => m.imdbID === movie.imdbID)) return prev;
-      return [...prev, movie];
-    });
+    const m = normalize(movie);
+    setWatchlist((prev) => (prev.some((x) => x.imdbID === m.imdbID) ? prev : [...prev, m]));
   }, []);
 
   const removeFromWatchlist = useCallback((id: string) => {
@@ -138,11 +86,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markAsWatched = useCallback((movie: Movie) => {
-    setWatchlist((prev) => prev.filter((m) => m.imdbID !== movie.imdbID));
-    setWatched((prev) => {
-      if (prev.some((m) => m.imdbID === movie.imdbID)) return prev;
-      return [...prev, movie];
-    });
+    const m = normalize(movie);
+    setWatchlist((prev) => prev.filter((x) => x.imdbID !== m.imdbID));
+    setWatched((prev) => (prev.some((x) => x.imdbID === m.imdbID) ? prev : [...prev, m]));
   }, []);
 
   const removeFromWatched = useCallback((id: string) => {
@@ -163,9 +109,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider
       value={{
-        isAuthenticated,
-        login,
-        logout,
         watchlist,
         watched,
         addToWatchlist,
@@ -174,7 +117,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         removeFromWatched,
         isInWatchlist,
         isInWatched,
-        syncing,
       }}
     >
       {children}

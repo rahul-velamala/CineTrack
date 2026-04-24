@@ -6,7 +6,6 @@ import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
-import AuthGuard from "@/components/AuthGuard";
 import { useApp } from "@/context/AppContext";
 import {
   getMovieDetails, getMovieVideos, getRecommendations, getWatchProviders,
@@ -89,7 +88,7 @@ export default function MovieDetailPage() {
 
   if (loading) {
     return (
-      <AuthGuard>
+      <>
         <Navbar />
         <main className="min-h-screen pt-16">
           <div className="max-w-6xl mx-auto px-4 py-12">
@@ -103,20 +102,20 @@ export default function MovieDetailPage() {
             </div>
           </div>
         </main>
-      </AuthGuard>
+      </>
     );
   }
 
   if (!detail) {
     return (
-      <AuthGuard>
+      <>
         <Navbar />
         <main className="min-h-screen pt-16 flex flex-col items-center justify-center gap-4">
           <span className="text-5xl">😕</span>
           <p className="text-cinema-muted">Movie not found</p>
           <Link href="/home" className="text-cinema-purple hover:underline text-sm">← Back to search</Link>
         </main>
-      </AuthGuard>
+      </>
     );
   }
 
@@ -140,7 +139,7 @@ export default function MovieDetailPage() {
   const hasProviders = streamOn.length > 0 || rentOn.length > 0 || buyOn.length > 0;
 
   return (
-    <AuthGuard>
+    <>
       <Navbar />
       <main className="min-h-screen pt-16">
         {/* Hero backdrop */}
@@ -379,6 +378,6 @@ export default function MovieDetailPage() {
           </section>
         )}
       </main>
-    </AuthGuard>
+    </>
   );
 }
