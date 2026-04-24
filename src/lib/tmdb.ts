@@ -16,9 +16,13 @@ export interface TMDBSearchResult {
   title?: string;
   release_date?: string;
   poster_path?: string | null;
+  backdrop_path?: string | null;
   vote_average?: number;
   overview?: string;
   genre_ids?: number[];
+  // TV fields
+  first_air_date?: string;
+  origin_country?: string[];
   // Person fields
   name?: string;
   profile_path?: string | null;
@@ -46,6 +50,33 @@ export interface TMDBMovieDetail {
   };
 }
 
+export interface TMDBTVDetail {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  first_air_date: string;
+  last_air_date?: string;
+  vote_average: number;
+  episode_run_time: number[];
+  number_of_seasons: number;
+  number_of_episodes: number;
+  status: string;
+  in_production: boolean;
+  genres: { id: number; name: string }[];
+  spoken_languages: { english_name: string; iso_639_1: string }[];
+  credits: {
+    cast: { name: string; character: string; profile_path: string | null }[];
+    crew: { name: string; job: string; department: string }[];
+  };
+  videos: {
+    results: { key: string; site: string; type: string; name: string }[];
+  };
+  created_by?: { id: number; name: string }[];
+  networks?: { id: number; name: string; logo_path: string | null }[];
+}
+
 // --- Genre Map ---
 
 const GENRE_MAP: Record<number, string> = {
@@ -54,6 +85,13 @@ const GENRE_MAP: Record<number, string> = {
   14: "Fantasy", 36: "History", 27: "Horror", 10402: "Music",
   9648: "Mystery", 10749: "Romance", 878: "Sci-Fi", 10770: "TV Movie",
   53: "Thriller", 10752: "War", 37: "Western",
+};
+
+const TV_GENRE_MAP: Record<number, string> = {
+  10759: "Action & Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
+  99: "Documentary", 18: "Drama", 10751: "Family", 10762: "Kids",
+  9648: "Mystery", 10763: "News", 10764: "Reality", 10765: "Sci-Fi & Fantasy",
+  10766: "Soap", 10767: "Talk", 10768: "War & Politics", 37: "Western",
 };
 
 // --- Image helpers ---
@@ -86,11 +124,27 @@ export async function searchMovies(query: string): Promise<TMDBSearchResult[]> {
   return data.results || [];
 }
 
+export async function searchTV(query: string): Promise<TMDBSearchResult[]> {
+  const res = await fetch(
+    `${BASE}/search/tv?api_key=${apiKey()}&query=${encodeURIComponent(query)}&include_adult=false&page=1`
+  );
+  const data = await res.json();
+  return data.results || [];
+}
+
 // --- Movie Details ---
 
 export async function getMovieDetails(id: string | number): Promise<TMDBMovieDetail | null> {
   const res = await fetch(
     `${BASE}/movie/${id}?api_key=${apiKey()}&append_to_response=credits,videos&include_video_language=en,hi,te,ta,ml,null`
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function getTVDetails(id: string | number): Promise<TMDBTVDetail | null> {
+  const res = await fetch(
+    `${BASE}/tv/${id}?api_key=${apiKey()}&append_to_response=credits,videos&include_video_language=en,hi,te,ta,ml,null`
   );
   if (!res.ok) return null;
   return res.json();
@@ -106,11 +160,27 @@ export async function getTrending(timeWindow: "day" | "week" = "week"): Promise<
   return data.results || [];
 }
 
+export async function getTrendingAll(timeWindow: "day" | "week" = "week"): Promise<TMDBSearchResult[]> {
+  const res = await fetch(
+    `${BASE}/trending/all/${timeWindow}?api_key=${apiKey()}&page=1`
+  );
+  const data = await res.json();
+  return data.results || [];
+}
+
 // --- Recommendations ---
 
 export async function getRecommendations(id: string | number): Promise<TMDBSearchResult[]> {
   const res = await fetch(
     `${BASE}/movie/${id}/recommendations?api_key=${apiKey()}&page=1`
+  );
+  const data = await res.json();
+  return (data.results || []).slice(0, 10);
+}
+
+export async function getTVRecommendations(id: string | number): Promise<TMDBSearchResult[]> {
+  const res = await fetch(
+    `${BASE}/tv/${id}/recommendations?api_key=${apiKey()}&page=1`
   );
   const data = await res.json();
   return (data.results || []).slice(0, 10);
@@ -139,6 +209,14 @@ export async function getWatchProviders(id: string | number, region: string = "I
   return data.results?.[region] || data.results?.["US"] || null;
 }
 
+export async function getTVWatchProviders(id: string | number, region: string = "IN"): Promise<WatchProviderData | null> {
+  const res = await fetch(
+    `${BASE}/tv/${id}/watch/providers?api_key=${apiKey()}`
+  );
+  const data = await res.json();
+  return data.results?.[region] || data.results?.["US"] || null;
+}
+
 // Fetch videos separately across ALL languages as fallback
 export async function getMovieVideos(id: string | number): Promise<{ key: string; site: string; type: string; name: string }[]> {
   // Try with no language filter to get everything
@@ -149,18 +227,54 @@ export async function getMovieVideos(id: string | number): Promise<{ key: string
   return data.results || [];
 }
 
+export async function getTVVideos(id: string | number): Promise<{ key: string; site: string; type: string; name: string }[]> {
+  const res = await fetch(
+    `${BASE}/tv/${id}/videos?api_key=${apiKey()}`
+  );
+  const data = await res.json();
+  return data.results || [];
+}
+
 // --- Conversion to our Movie interface ---
 
 export function tmdbToMovie(t: TMDBSearchResult): Movie {
+  const mediaType = t.media_type === "tv" ? "tv" : "movie";
+  const genreMap = mediaType === "tv" ? TV_GENRE_MAP : GENRE_MAP;
+  const dateField = mediaType === "tv" ? t.first_air_date : t.release_date;
   return {
     imdbID: String(t.id),
     Title: t.title || t.name || "Unknown",
-    Year: t.release_date?.split("-")[0] || "N/A",
+    Year: dateField?.split("-")[0] || "N/A",
     Poster: posterUrl(t.poster_path),
     imdbRating: t.vote_average ? t.vote_average.toFixed(1) : "N/A",
-    Genre: t.genre_ids?.map((id) => GENRE_MAP[id] || "").filter(Boolean).join(", ") || undefined,
+    Genre: t.genre_ids?.map((id) => genreMap[id] || "").filter(Boolean).join(", ") || undefined,
     Plot: t.overview || undefined,
-    Type: "movie",
+    Type: mediaType,
+    mediaType,
+  };
+}
+
+export function tmdbTVToMovie(t: TMDBTVDetail): Movie {
+  const creator = t.created_by?.[0]?.name;
+  const cast = t.credits?.cast?.slice(0, 5).map((c) => c.name).join(", ");
+  const runtime = t.episode_run_time?.[0] ? `${t.episode_run_time[0]} min/ep` : undefined;
+
+  return {
+    imdbID: String(t.id),
+    Title: t.name,
+    Year: t.first_air_date?.split("-")[0] || "N/A",
+    Poster: posterUrl(t.poster_path),
+    imdbRating: t.vote_average ? t.vote_average.toFixed(1) : "N/A",
+    Genre: t.genres?.map((g) => g.name).join(", ") || undefined,
+    Plot: t.overview || undefined,
+    Language: t.spoken_languages?.[0]?.english_name || undefined,
+    Runtime: runtime,
+    Director: creator || undefined,
+    Actors: cast || undefined,
+    Type: "tv",
+    mediaType: "tv",
+    Seasons: t.number_of_seasons,
+    Episodes: t.number_of_episodes,
   };
 }
 

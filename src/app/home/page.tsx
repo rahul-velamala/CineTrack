@@ -4,17 +4,17 @@ import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import MovieCard from "@/components/MovieCard";
-import { getTrending, tmdbToMovie, TMDBSearchResult } from "@/lib/tmdb";
+import { media, titleHref, type MediaItem } from "@/lib/media";
 
 export default function HomePage() {
   const [searchKey, setSearchKey] = useState(0);
   const [initialQuery, setInitialQuery] = useState("");
-  const [trending, setTrending] = useState<TMDBSearchResult[]>([]);
+  const [trending, setTrending] = useState<MediaItem[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
 
   useEffect(() => {
-    getTrending("week")
-      .then((results) => setTrending(results.slice(0, 10)))
+    media.getTrendingAll("week")
+      .then((results) => setTrending(results.slice(0, 12)))
       .catch(() => {})
       .finally(() => setTrendingLoading(false));
   }, []);
@@ -28,7 +28,6 @@ export default function HomePage() {
     <>
       <Navbar />
       <main className="min-h-screen pt-16">
-        {/* Hero Section */}
         <section className="relative pt-20 pb-16 px-4">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-cinema-purple/10 rounded-full blur-[120px]" />
@@ -40,19 +39,18 @@ export default function HomePage() {
                 Discover &{" "}
                 <span className="text-gradient-gold">Track</span>
                 <br />
-                Your Movies
+                Movies & Shows
               </h1>
               <p className="text-cinema-muted text-lg max-w-lg mx-auto">
-                Search any movie or actor, watch trailers, and manage your personal watchlist — all in one place.
+                Search movies, TV series, and actors. Watch trailers. Build your personal watchlist.
               </p>
             </div>
 
             <SearchBar key={searchKey} initialQuery={initialQuery} />
 
-            {/* Clickable suggestion chips */}
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <span className="text-cinema-muted">Try:</span>
-              {["Inception", "3 Idiots", "Interstellar", "Dangal", "Shah Rukh Khan", "Leonardo DiCaprio"].map((title) => (
+              {["Inception", "Breaking Bad", "3 Idiots", "Succession", "Dangal", "Shah Rukh Khan"].map((title) => (
                 <button
                   key={title}
                   onClick={() => handleChipClick(title)}
@@ -65,13 +63,12 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Feature hints */}
         <section className="max-w-5xl mx-auto px-4 pb-12">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { icon: "🔍", title: "Search", desc: "Find movies by title, actor, or even partial names" },
-              { icon: "🎬", title: "Watch Trailers", desc: "Watch trailers right on the page" },
-              { icon: "📋", title: "Track Movies", desc: "Save to watchlist or mark as watched" },
+              { icon: "🔍", title: "Search", desc: "Movies, TV, actors, partial names — all covered" },
+              { icon: "🎬", title: "Trailers", desc: "Watch official trailers right on the page" },
+              { icon: "📋", title: "Track", desc: "Save to watchlist or mark as watched" },
             ].map((feature) => (
               <div
                 key={feature.title}
@@ -85,7 +82,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Trending Movies */}
         <section className="max-w-6xl mx-auto px-4 pb-16">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl sm:text-2xl font-bold font-[family-name:var(--font-display)] flex items-center gap-2">
@@ -101,14 +97,14 @@ export default function HomePage() {
             </div>
           ) : trending.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {trending.map((movie, index) => (
-                <div key={movie.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                  <MovieCard movie={tmdbToMovie(movie)} />
+              {trending.map((item, index) => (
+                <div key={`${item.mediaType}-${item.id}`} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                  <MovieCard movie={media.toMovie(item)} href={titleHref(item.mediaType, item.id)} />
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-cinema-muted text-sm text-center py-8">Could not load trending movies.</p>
+            <p className="text-cinema-muted text-sm text-center py-8">Could not load trending content.</p>
           )}
         </section>
       </main>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { searchMulti, TMDBSearchResult, posterUrl } from "@/lib/tmdb";
+import { titleHref, type MediaType } from "@/lib/media";
 
 interface DisplayResult {
   id: number;
@@ -11,7 +12,7 @@ interface DisplayResult {
   year: string;
   poster: string;
   rating: string;
-  type: "movie" | "person";
+  type: MediaType;
   subtitle?: string;
 }
 
@@ -27,8 +28,17 @@ function flattenResults(raw: TMDBSearchResult[]): DisplayResult[] {
         rating: item.vote_average ? item.vote_average.toFixed(1) : "",
         type: "movie",
       });
+    } else if (item.media_type === "tv" && item.name) {
+      results.push({
+        id: item.id,
+        title: item.name,
+        year: item.first_air_date?.split("-")[0] || "",
+        poster: posterUrl(item.poster_path, "w92"),
+        rating: item.vote_average ? item.vote_average.toFixed(1) : "",
+        type: "tv",
+        subtitle: "Series",
+      });
     } else if (item.media_type === "person" && item.known_for) {
-      // Show the person's known movies as results
       for (const kf of item.known_for) {
         if (kf.media_type === "movie" && kf.title) {
           results.push({
@@ -40,15 +50,25 @@ function flattenResults(raw: TMDBSearchResult[]): DisplayResult[] {
             type: "movie",
             subtitle: `via ${item.name}`,
           });
+        } else if (kf.media_type === "tv" && kf.name) {
+          results.push({
+            id: kf.id,
+            title: kf.name,
+            year: kf.first_air_date?.split("-")[0] || "",
+            poster: posterUrl(kf.poster_path, "w92"),
+            rating: kf.vote_average ? kf.vote_average.toFixed(1) : "",
+            type: "tv",
+            subtitle: `Series · via ${item.name}`,
+          });
         }
       }
     }
   }
-  // Deduplicate by id
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   return results.filter((r) => {
-    if (seen.has(r.id)) return false;
-    seen.add(r.id);
+    const key = `${r.type}-${r.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   }).slice(0, 10);
 }
@@ -67,14 +87,6 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
-
-  // If initialQuery is provided, trigger search on mount
-  useEffect(() => {
-    if (initialQuery && initialQuery.length >= 2) {
-      doSearch(initialQuery);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const doSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) {
@@ -96,6 +108,13 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
   }, []);
 
   useEffect(() => {
+    if (initialQuery && initialQuery.length >= 2) {
+      doSearch(initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     if (query.length < 2) {
       setResults([]);
@@ -108,7 +127,6 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
     };
   }, [query, doSearch]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -119,10 +137,10 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (id: number) => {
+  const handleSelect = (item: DisplayResult) => {
     setShowDropdown(false);
     setQuery("");
-    router.push(`/movie/${id}`);
+    router.push(titleHref(item.type, item.id));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -135,7 +153,7 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : results.length - 1));
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
-      handleSelect(results[selectedIndex].id);
+      handleSelect(results[selectedIndex]);
     } else if (e.key === "Escape") {
       setShowDropdown(false);
     }
@@ -143,7 +161,6 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
 
   return (
     <div ref={dropdownRef} className="relative w-full max-w-2xl mx-auto">
-      {/* Input */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-cinema-muted">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -160,7 +177,7 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
           }}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
           onKeyDown={handleKeyDown}
-          placeholder="Search movies, actors... (Bollywood, Hollywood & more)"
+          placeholder="Search movies, TV shows, actors..."
           className="w-full pl-12 pr-12 py-4 rounded-2xl bg-cinema-surface border border-cinema-border text-cinema-text placeholder:text-cinema-muted/60 text-base focus:outline-none focus:border-cinema-purple focus:ring-1 focus:ring-cinema-purple/50 transition-all"
           autoComplete="off"
         />
@@ -181,15 +198,14 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
         )}
       </div>
 
-      {/* Dropdown */}
       {showDropdown && (
         <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl glass-strong overflow-hidden shadow-2xl shadow-black/50 animate-slide-down z-50">
           {results.length > 0 ? (
             <div className="max-h-[480px] overflow-y-auto">
               {results.map((item, index) => (
                 <button
-                  key={`${item.id}-${index}`}
-                  onClick={() => handleSelect(item.id)}
+                  key={`${item.type}-${item.id}-${index}`}
+                  onClick={() => handleSelect(item)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer ${
                     index === selectedIndex
                       ? "bg-cinema-purple/15"
@@ -205,6 +221,11 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
                       className="object-cover"
                       unoptimized
                     />
+                    {item.type === "tv" && (
+                      <span className="absolute top-0.5 left-0.5 text-[8px] font-bold uppercase px-1 py-0.5 rounded bg-black/70 text-white border border-white/10">
+                        TV
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-cinema-text truncate">{item.title}</p>
@@ -232,7 +253,7 @@ export default function SearchBar({ initialQuery }: SearchBarProps) {
             </div>
           ) : (
             <div className="px-4 py-8 text-center text-cinema-muted text-sm">
-              {query.length >= 2 ? "No movies found. Try a different search." : "Type at least 2 characters to search."}
+              {query.length >= 2 ? "Nothing found. Try a different search." : "Type at least 2 characters to search."}
             </div>
           )}
         </div>

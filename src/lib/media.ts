@@ -23,6 +23,9 @@ export interface MediaDetail extends MediaItem {
   director?: string;
   cast?: string[];
   trailerKey?: string | null;
+  releaseDate?: string;
+  status?: string;
+  inProduction?: boolean;
 }
 
 export interface WatchProviderInfo {
@@ -38,8 +41,10 @@ export interface MediaProvider {
   searchTV(query: string): Promise<MediaItem[]>;
   getDetail(type: MediaType, id: string): Promise<MediaDetail | null>;
   getTrending(window: "day" | "week"): Promise<MediaItem[]>;
+  getTrendingAll(window: "day" | "week"): Promise<MediaItem[]>;
   getRecommendations(type: MediaType, id: string): Promise<MediaItem[]>;
   getWatchProviders(type: MediaType, id: string, region?: string): Promise<WatchProviderInfo | null>;
+  resolveTrailerKey(type: MediaType, id: string, existingKey: string | null): Promise<string | null>;
   toMovie(item: MediaItem): Movie;
   toMovieFromDetail(detail: MediaDetail): Movie;
 }
@@ -49,12 +54,14 @@ function mapSearchResult(r: tmdb.TMDBSearchResult, fallbackType: MediaType = "mo
   const mediaType: MediaType = rawType === "tv" ? "tv" : rawType === "movie" ? "movie" : fallbackType;
   const title = r.title || r.name;
   if (!title) return null;
+  const dateField = mediaType === "tv" ? r.first_air_date : r.release_date;
   return {
     id: String(r.id),
     mediaType,
     title,
-    year: r.release_date?.split("-")[0] || "",
+    year: dateField?.split("-")[0] || "",
     posterUrl: tmdb.posterUrl(r.poster_path),
+    backdropUrl: r.backdrop_path ? tmdb.backdropUrl(r.backdrop_path) : undefined,
     rating: r.vote_average ? r.vote_average.toFixed(1) : undefined,
     overview: r.overview || undefined,
   };
@@ -69,53 +76,89 @@ const tmdbProvider: MediaProvider = {
     const raw = await tmdb.searchMovies(query);
     return raw.map((r) => mapSearchResult(r, "movie")).filter((x): x is MediaItem => x !== null);
   },
-  async searchTV() {
-    // TMDB /search/tv wired up in Phase 1
-    return [];
+  async searchTV(query) {
+    const raw = await tmdb.searchTV(query);
+    return raw.map((r) => mapSearchResult(r, "tv")).filter((x): x is MediaItem => x !== null);
   },
   async getDetail(type, id) {
-    if (type !== "movie") return null;
-    const d = await tmdb.getMovieDetails(id);
-    if (!d) return null;
-    const trailerKey = tmdb.getTrailerKey(d);
+    if (type === "movie") {
+      const d = await tmdb.getMovieDetails(id);
+      if (!d) return null;
+      return {
+        id: String(d.id),
+        mediaType: "movie",
+        title: d.title,
+        year: d.release_date?.split("-")[0] || "",
+        posterUrl: tmdb.posterUrl(d.poster_path),
+        backdropUrl: tmdb.backdropUrl(d.backdrop_path),
+        rating: d.vote_average ? d.vote_average.toFixed(1) : undefined,
+        overview: d.overview,
+        genres: d.genres?.map((g) => g.name),
+        runtime: d.runtime ? `${d.runtime} min` : undefined,
+        language: d.spoken_languages?.[0]?.english_name,
+        director: d.credits?.crew?.find((c) => c.job === "Director")?.name,
+        cast: d.credits?.cast?.slice(0, 5).map((c) => c.name),
+        trailerKey: tmdb.getTrailerKey(d),
+        releaseDate: d.release_date,
+      };
+    }
+    const t = await tmdb.getTVDetails(id);
+    if (!t) return null;
+    const creator = t.created_by?.[0]?.name;
+    const runtime = t.episode_run_time?.[0] ? `${t.episode_run_time[0]} min/ep` : undefined;
     return {
-      id: String(d.id),
-      mediaType: "movie",
-      title: d.title,
-      year: d.release_date?.split("-")[0] || "",
-      posterUrl: tmdb.posterUrl(d.poster_path),
-      backdropUrl: tmdb.backdropUrl(d.backdrop_path),
-      rating: d.vote_average ? d.vote_average.toFixed(1) : undefined,
-      overview: d.overview,
-      genres: d.genres?.map((g) => g.name),
-      runtime: d.runtime ? `${d.runtime} min` : undefined,
-      language: d.spoken_languages?.[0]?.english_name,
-      director: d.credits?.crew?.find((c) => c.job === "Director")?.name,
-      cast: d.credits?.cast?.slice(0, 5).map((c) => c.name),
-      trailerKey,
+      id: String(t.id),
+      mediaType: "tv",
+      title: t.name,
+      year: t.first_air_date?.split("-")[0] || "",
+      posterUrl: tmdb.posterUrl(t.poster_path),
+      backdropUrl: tmdb.backdropUrl(t.backdrop_path),
+      rating: t.vote_average ? t.vote_average.toFixed(1) : undefined,
+      overview: t.overview,
+      genres: t.genres?.map((g) => g.name),
+      runtime,
+      seasons: t.number_of_seasons,
+      episodes: t.number_of_episodes,
+      language: t.spoken_languages?.[0]?.english_name,
+      director: creator,
+      cast: t.credits?.cast?.slice(0, 5).map((c) => c.name),
+      trailerKey: tmdb.findTrailerKey(t.videos?.results || []),
+      releaseDate: t.first_air_date,
+      status: t.status,
+      inProduction: t.in_production,
     };
   },
   async getTrending(window) {
     const raw = await tmdb.getTrending(window);
     return raw.map((r) => mapSearchResult(r, "movie")).filter((x): x is MediaItem => x !== null);
   },
+  async getTrendingAll(window) {
+    const raw = await tmdb.getTrendingAll(window);
+    return raw
+      .filter((r) => r.media_type === "movie" || r.media_type === "tv")
+      .map((r) => mapSearchResult(r))
+      .filter((x): x is MediaItem => x !== null);
+  },
   async getRecommendations(type, id) {
-    if (type !== "movie") return [];
-    const raw = await tmdb.getRecommendations(id);
-    return raw.map((r) => mapSearchResult(r, "movie")).filter((x): x is MediaItem => x !== null);
+    const raw = type === "tv" ? await tmdb.getTVRecommendations(id) : await tmdb.getRecommendations(id);
+    return raw.map((r) => mapSearchResult(r, type)).filter((x): x is MediaItem => x !== null);
   },
   async getWatchProviders(type, id, region = "IN") {
-    if (type !== "movie") return null;
-    const data = await tmdb.getWatchProviders(id, region);
+    const data = type === "tv" ? await tmdb.getTVWatchProviders(id, region) : await tmdb.getWatchProviders(id, region);
     if (!data) return null;
     const m = (arr?: tmdb.WatchProvider[]) =>
-      (arr || []).map((p) => ({ name: p.provider_name, logo: tmdb.posterUrl(p.logo_path, "w92") }));
+      (arr || []).map((p) => ({ name: p.provider_name, logo: `https://image.tmdb.org/t/p/w45${p.logo_path}` }));
     return {
       link: data.link,
       streaming: m(data.flatrate),
       rent: m(data.rent),
       buy: m(data.buy),
     };
+  },
+  async resolveTrailerKey(type, id, existingKey) {
+    if (existingKey) return existingKey;
+    const vids = type === "tv" ? await tmdb.getTVVideos(id) : await tmdb.getMovieVideos(id);
+    return tmdb.findTrailerKey(vids);
   },
   toMovie(item) {
     return {
@@ -152,3 +195,8 @@ const tmdbProvider: MediaProvider = {
 };
 
 export const media: MediaProvider = tmdbProvider;
+
+// Build canonical route path for a title
+export function titleHref(type: MediaType, id: string | number): string {
+  return `/title/${type}/${id}`;
+}
