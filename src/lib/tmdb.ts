@@ -30,6 +30,19 @@ export interface TMDBSearchResult {
   known_for?: TMDBSearchResult[];
 }
 
+export interface TMDBVideo {
+  id?: string;
+  key: string;
+  site: string;
+  type: string;
+  name: string;
+  iso_639_1?: string;
+  iso_3166_1?: string;
+  official?: boolean;
+  published_at?: string;
+  size?: number;
+}
+
 export interface TMDBMovieDetail {
   id: number;
   title: string;
@@ -46,7 +59,7 @@ export interface TMDBMovieDetail {
     crew: { name: string; job: string }[];
   };
   videos: {
-    results: { key: string; site: string; type: string; name: string }[];
+    results: TMDBVideo[];
   };
 }
 
@@ -71,7 +84,7 @@ export interface TMDBTVDetail {
     crew: { name: string; job: string; department: string }[];
   };
   videos: {
-    results: { key: string; site: string; type: string; name: string }[];
+    results: TMDBVideo[];
   };
   created_by?: { id: number; name: string }[];
   networks?: { id: number; name: string; logo_path: string | null }[];
@@ -358,7 +371,7 @@ export async function getTVWatchProviders(id: string | number, region: string = 
 }
 
 // Fetch videos separately across ALL languages as fallback
-export async function getMovieVideos(id: string | number): Promise<{ key: string; site: string; type: string; name: string }[]> {
+export async function getMovieVideos(id: string | number): Promise<TMDBVideo[]> {
   // Try with no language filter to get everything
   const res = await fetch(
     `${BASE}/movie/${id}/videos?api_key=${apiKey()}`
@@ -367,12 +380,17 @@ export async function getMovieVideos(id: string | number): Promise<{ key: string
   return data.results || [];
 }
 
-export async function getTVVideos(id: string | number): Promise<{ key: string; site: string; type: string; name: string }[]> {
+export async function getTVVideos(id: string | number): Promise<TMDBVideo[]> {
   const res = await fetch(
     `${BASE}/tv/${id}/videos?api_key=${apiKey()}`
   );
   const data = await res.json();
   return data.results || [];
+}
+
+export async function getAllVideos(type: "movie" | "tv", id: string | number): Promise<TMDBVideo[]> {
+  const vids = type === "tv" ? await getTVVideos(id) : await getMovieVideos(id);
+  return vids.filter((v) => v.site === "YouTube");
 }
 
 // --- Conversion to our Movie interface ---
@@ -440,7 +458,7 @@ export function tmdbDetailToMovie(t: TMDBMovieDetail): Movie {
 
 // --- Get trailer YouTube ID from videos array ---
 
-export function findTrailerKey(vids: { key: string; site: string; type: string; name: string }[]): string | null {
+export function findTrailerKey(vids: TMDBVideo[]): string | null {
   // Prefer official trailer, then teaser, then any YouTube video
   const trailer = vids.find((v) => v.site === "YouTube" && v.type === "Trailer")
     || vids.find((v) => v.site === "YouTube" && v.type === "Teaser")

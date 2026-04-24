@@ -16,6 +16,15 @@ export interface MediaItem {
   popularity?: number;
 }
 
+export interface VideoItem {
+  key: string;
+  name: string;
+  type: string; // Trailer | Teaser | Clip | Featurette | Behind the Scenes | ...
+  language?: string; // iso_639_1
+  official?: boolean;
+  publishedAt?: string;
+}
+
 export interface MediaDetail extends MediaItem {
   runtime?: string;
   seasons?: number;
@@ -81,6 +90,7 @@ export interface MediaProvider {
   getRecommendations(type: MediaType, id: string): Promise<MediaItem[]>;
   getWatchProviders(type: MediaType, id: string, region?: string): Promise<WatchProviderInfo | null>;
   resolveTrailerKey(type: MediaType, id: string, existingKey: string | null): Promise<string | null>;
+  getVideos(type: MediaType, id: string): Promise<VideoItem[]>;
   getPerson(id: string): Promise<PersonDetail | null>;
   getPersonCredits(id: string): Promise<PersonCredit[]>;
   toMovie(item: MediaItem): Movie;
@@ -258,6 +268,17 @@ const tmdbProvider: MediaProvider = {
     if (existingKey) return existingKey;
     const vids = type === "tv" ? await tmdb.getTVVideos(id) : await tmdb.getMovieVideos(id);
     return tmdb.findTrailerKey(vids);
+  },
+  async getVideos(type, id) {
+    const raw = await tmdb.getAllVideos(type, id);
+    return raw.map((v) => ({
+      key: v.key,
+      name: v.name,
+      type: v.type,
+      language: v.iso_639_1,
+      official: v.official,
+      publishedAt: v.published_at,
+    }));
   },
   async getPerson(id) {
     const p = await tmdb.getPersonDetail(id);

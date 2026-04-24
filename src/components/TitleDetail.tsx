@@ -5,8 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
+import TrailerModal from "@/components/TrailerModal";
 import { useApp } from "@/context/AppContext";
-import { media, titleHref, type MediaDetail, type MediaItem, type MediaType, type WatchProviderInfo } from "@/lib/media";
+import { media, titleHref, type MediaDetail, type MediaItem, type MediaType, type VideoItem, type WatchProviderInfo } from "@/lib/media";
 
 const PROVIDER_LINKS: Record<string, (q: string) => string> = {
   "Netflix":            (q) => `https://www.netflix.com/search?q=${encodeURIComponent(q)}`,
@@ -45,10 +46,12 @@ interface Props {
 export default function TitleDetail({ type, id }: Props) {
   const [detail, setDetail] = useState<MediaDetail | null>(null);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
   const [trailerLoading, setTrailerLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
   const [providers, setProviders] = useState<WatchProviderInfo | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const { addToWatchlist, markAsWatched, isInWatchlist, isInWatched, removeFromWatchlist, removeFromWatched } = useApp();
 
   useEffect(() => {
@@ -56,20 +59,27 @@ export default function TitleDetail({ type, id }: Props) {
     async function fetchAll() {
       setLoading(true);
       setTrailerLoading(true);
+      setVideos([]);
       try {
-        const [data, recs, prov] = await Promise.all([
+        const [data, recs, prov, vids] = await Promise.all([
           media.getDetail(type, id),
           media.getRecommendations(type, id),
           media.getWatchProviders(type, id),
+          media.getVideos(type, id),
         ]);
         if (cancelled) return;
         setDetail(data);
         setRecommendations(recs);
         setProviders(prov);
+        setVideos(vids);
 
-        if (data) {
-          const key = await media.resolveTrailerKey(type, id, data.trailerKey ?? null);
-          if (!cancelled) setTrailerKey(key);
+        const keyFromDetail = data?.trailerKey ?? null;
+        if (keyFromDetail) {
+          setTrailerKey(keyFromDetail);
+        } else {
+          // Derive from fetched videos (all-language list)
+          const trailer = vids.find((v) => v.type === "Trailer") || vids.find((v) => v.type === "Teaser") || vids[0];
+          setTrailerKey(trailer?.key ?? null);
         }
       } finally {
         if (!cancelled) {
@@ -267,25 +277,54 @@ export default function TitleDetail({ type, id }: Props) {
         </div>
 
         <section className="max-w-6xl mx-auto px-4 py-8">
-          <h2 className="text-lg font-semibold font-[family-name:var(--font-display)] mb-4 flex items-center gap-2">
-            <span>🎥</span> Trailer
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold font-[family-name:var(--font-display)] flex items-center gap-2">
+              <span>🎥</span> Videos
+              {videos.length > 0 && <span className="text-cinema-muted text-sm font-normal">({videos.length})</span>}
+            </h2>
+            {videos.length > 0 && (
+              <button
+                onClick={() => setModalOpen(true)}
+                className="text-xs text-cinema-purple hover:underline cursor-pointer"
+              >
+                See all →
+              </button>
+            )}
+          </div>
+
           {trailerLoading ? (
             <div className="w-full aspect-video rounded-2xl skeleton" />
           ) : trailerKey ? (
-            <div className="w-full aspect-video rounded-2xl overflow-hidden border border-cinema-border/30 shadow-2xl">
-              <iframe
-                src={`https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1`}
-                title={`${movie.Title} Trailer`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full"
+            <button
+              onClick={() => setModalOpen(true)}
+              aria-label="Play trailer"
+              className="group relative w-full aspect-video rounded-2xl overflow-hidden border border-cinema-border/30 shadow-2xl cursor-pointer block"
+            >
+              <Image
+                src={`https://img.youtube.com/vi/${trailerKey}/maxresdefault.jpg`}
+                alt={`${movie.Title} trailer thumbnail`}
+                fill
+                sizes="(max-width: 768px) 100vw, 1024px"
+                className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                unoptimized
               />
-            </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30 group-hover:from-black/60 transition-all" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-600/90 group-hover:bg-red-600 flex items-center justify-center shadow-2xl shadow-red-600/50 transition-all group-hover:scale-110">
+                  <svg className="w-10 h-10 sm:w-12 sm:h-12 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </div>
+              </div>
+              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
+                <p className="text-white text-sm sm:text-base font-semibold line-clamp-1">Watch trailer</p>
+                <span className="text-[11px] uppercase tracking-wider text-white/70 bg-black/40 px-2 py-1 rounded backdrop-blur-sm hidden sm:inline">
+                  Fullscreen · Multi-language
+                </span>
+              </div>
+            </button>
           ) : (
             <div className="w-full aspect-video rounded-2xl bg-cinema-card border border-cinema-border/30 flex flex-col items-center justify-center gap-4">
               <span className="text-4xl">🎬</span>
-              <p className="text-cinema-muted text-sm">Trailer not available</p>
+              <p className="text-cinema-muted text-sm">No official trailer available</p>
               <a
                 href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${movie.Title} ${movie.Year} official trailer`)}`}
                 target="_blank" rel="noopener noreferrer"
@@ -296,6 +335,14 @@ export default function TitleDetail({ type, id }: Props) {
             </div>
           )}
         </section>
+
+        <TrailerModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title={movie.Title}
+          videos={videos}
+          initialKey={trailerKey}
+        />
 
         <section className="max-w-6xl mx-auto px-4 pb-8">
           <h2 className="text-lg font-semibold font-[family-name:var(--font-display)] mb-4 flex items-center gap-2">
