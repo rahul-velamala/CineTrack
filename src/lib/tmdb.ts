@@ -132,6 +132,146 @@ export async function searchTV(query: string): Promise<TMDBSearchResult[]> {
   return data.results || [];
 }
 
+// --- Paged search (for /search results page) ---
+
+export interface TMDBPagedResponse {
+  page: number;
+  results: TMDBSearchResult[];
+  total_pages: number;
+  total_results: number;
+}
+
+export async function searchMultiPaged(query: string, page: number = 1): Promise<TMDBPagedResponse> {
+  const res = await fetch(
+    `${BASE}/search/multi?api_key=${apiKey()}&query=${encodeURIComponent(query)}&include_adult=false&page=${page}`
+  );
+  const data = await res.json();
+  return {
+    page: data.page || page,
+    results: data.results || [],
+    total_pages: data.total_pages || 0,
+    total_results: data.total_results || 0,
+  };
+}
+
+export async function searchMoviesPaged(query: string, page: number = 1): Promise<TMDBPagedResponse> {
+  const res = await fetch(
+    `${BASE}/search/movie?api_key=${apiKey()}&query=${encodeURIComponent(query)}&include_adult=false&page=${page}`
+  );
+  const data = await res.json();
+  return {
+    page: data.page || page,
+    results: data.results || [],
+    total_pages: data.total_pages || 0,
+    total_results: data.total_results || 0,
+  };
+}
+
+export async function searchTVPaged(query: string, page: number = 1): Promise<TMDBPagedResponse> {
+  const res = await fetch(
+    `${BASE}/search/tv?api_key=${apiKey()}&query=${encodeURIComponent(query)}&include_adult=false&page=${page}`
+  );
+  const data = await res.json();
+  return {
+    page: data.page || page,
+    results: data.results || [],
+    total_pages: data.total_pages || 0,
+    total_results: data.total_results || 0,
+  };
+}
+
+export async function searchPeoplePaged(query: string, page: number = 1): Promise<TMDBPagedResponse> {
+  const res = await fetch(
+    `${BASE}/search/person?api_key=${apiKey()}&query=${encodeURIComponent(query)}&include_adult=false&page=${page}`
+  );
+  const data = await res.json();
+  return {
+    page: data.page || page,
+    results: data.results || [],
+    total_pages: data.total_pages || 0,
+    total_results: data.total_results || 0,
+  };
+}
+
+// --- Keyword fallback (fuzzy retry on zero-result) ---
+
+export interface TMDBKeyword {
+  id: number;
+  name: string;
+}
+
+export async function searchKeyword(query: string): Promise<TMDBKeyword[]> {
+  const res = await fetch(
+    `${BASE}/search/keyword?api_key=${apiKey()}&query=${encodeURIComponent(query)}&page=1`
+  );
+  const data = await res.json();
+  return data.results || [];
+}
+
+export async function discoverByKeyword(keywordId: number, page: number = 1): Promise<TMDBPagedResponse> {
+  const res = await fetch(
+    `${BASE}/discover/movie?api_key=${apiKey()}&with_keywords=${keywordId}&include_adult=false&sort_by=popularity.desc&page=${page}`
+  );
+  const data = await res.json();
+  return {
+    page: data.page || page,
+    results: (data.results || []).map((r: TMDBSearchResult) => ({ ...r, media_type: "movie" })),
+    total_pages: data.total_pages || 0,
+    total_results: data.total_results || 0,
+  };
+}
+
+// --- Person details + filmography ---
+
+export interface TMDBPersonDetail {
+  id: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  known_for_department: string;
+  place_of_birth: string | null;
+  profile_path: string | null;
+  also_known_as: string[];
+}
+
+export interface TMDBPersonCredit extends TMDBSearchResult {
+  character?: string;
+  job?: string;
+  department?: string;
+  credit_id?: string;
+}
+
+export interface TMDBPersonCombinedCredits {
+  cast: TMDBPersonCredit[];
+  crew: TMDBPersonCredit[];
+}
+
+export async function getPersonDetail(id: string | number): Promise<TMDBPersonDetail | null> {
+  const res = await fetch(
+    `${BASE}/person/${id}?api_key=${apiKey()}`
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function getPersonCombinedCredits(id: string | number): Promise<TMDBPersonCombinedCredits> {
+  const res = await fetch(
+    `${BASE}/person/${id}/combined_credits?api_key=${apiKey()}`
+  );
+  if (!res.ok) return { cast: [], crew: [] };
+  const data = await res.json();
+  return {
+    cast: data.cast || [],
+    crew: data.crew || [],
+  };
+}
+
+export function profileUrl(path: string | null | undefined, size: "w185" | "w342" | "h632" = "h632"): string {
+  if (!path) return "/no-poster.svg";
+  return `${IMG}/${size}${path}`;
+}
+
 // --- Movie Details ---
 
 export async function getMovieDetails(id: string | number): Promise<TMDBMovieDetail | null> {

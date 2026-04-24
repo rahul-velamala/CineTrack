@@ -13,6 +13,7 @@ export interface MediaItem {
   rating?: string;
   overview?: string;
   genres?: string[];
+  popularity?: number;
 }
 
 export interface MediaDetail extends MediaItem {
@@ -35,16 +36,53 @@ export interface WatchProviderInfo {
   buy: { name: string; logo: string }[];
 }
 
+export interface PersonItem {
+  id: string;
+  name: string;
+  profileUrl: string;
+  knownForDepartment?: string;
+  knownFor?: MediaItem[];
+}
+
+export interface PersonDetail extends PersonItem {
+  biography?: string;
+  birthday?: string | null;
+  deathday?: string | null;
+  placeOfBirth?: string | null;
+  alsoKnownAs?: string[];
+}
+
+export interface PersonCredit extends MediaItem {
+  character?: string;
+  job?: string;
+}
+
+export interface PagedResult<T> {
+  page: number;
+  totalPages: number;
+  totalResults: number;
+  results: T[];
+}
+
+export type SearchScope = "all" | "movie" | "tv" | "person";
+
 export interface MediaProvider {
   search(query: string): Promise<MediaItem[]>;
   searchMovies(query: string): Promise<MediaItem[]>;
   searchTV(query: string): Promise<MediaItem[]>;
+  searchPaged(scope: SearchScope, query: string, page: number): Promise<PagedResult<MediaItem | PersonItem>>;
+  searchMoviesPaged(query: string, page: number): Promise<PagedResult<MediaItem>>;
+  searchTVPaged(query: string, page: number): Promise<PagedResult<MediaItem>>;
+  searchPeoplePaged(query: string, page: number): Promise<PagedResult<PersonItem>>;
+  keywordFallback(query: string, page: number): Promise<PagedResult<MediaItem>>;
   getDetail(type: MediaType, id: string): Promise<MediaDetail | null>;
   getTrending(window: "day" | "week"): Promise<MediaItem[]>;
   getTrendingAll(window: "day" | "week"): Promise<MediaItem[]>;
   getRecommendations(type: MediaType, id: string): Promise<MediaItem[]>;
   getWatchProviders(type: MediaType, id: string, region?: string): Promise<WatchProviderInfo | null>;
   resolveTrailerKey(type: MediaType, id: string, existingKey: string | null): Promise<string | null>;
+  getPerson(id: string): Promise<PersonDetail | null>;
+  getPersonCredits(id: string): Promise<PersonCredit[]>;
   toMovie(item: MediaItem): Movie;
   toMovieFromDetail(detail: MediaDetail): Movie;
 }
@@ -67,6 +105,29 @@ function mapSearchResult(r: tmdb.TMDBSearchResult, fallbackType: MediaType = "mo
   };
 }
 
+function mapPerson(r: tmdb.TMDBSearchResult): PersonItem | null {
+  if (!r.name) return null;
+  const knownFor = (r.known_for || [])
+    .map((k) => mapSearchResult(k))
+    .filter((x): x is MediaItem => x !== null);
+  return {
+    id: String(r.id),
+    name: r.name,
+    profileUrl: tmdb.profileUrl(r.profile_path, "w185"),
+    knownForDepartment: r.known_for_department,
+    knownFor,
+  };
+}
+
+function toPaged<T>(r: tmdb.TMDBPagedResponse, mapper: (raw: tmdb.TMDBSearchResult) => T | null): PagedResult<T> {
+  return {
+    page: r.page,
+    totalPages: r.total_pages,
+    totalResults: r.total_results,
+    results: r.results.map(mapper).filter((x): x is T => x !== null),
+  };
+}
+
 const tmdbProvider: MediaProvider = {
   async search(query) {
     const raw = await tmdb.searchMulti(query);
@@ -79,6 +140,44 @@ const tmdbProvider: MediaProvider = {
   async searchTV(query) {
     const raw = await tmdb.searchTV(query);
     return raw.map((r) => mapSearchResult(r, "tv")).filter((x): x is MediaItem => x !== null);
+  },
+  async searchPaged(scope, query, page) {
+    if (scope === "movie") return await tmdbProvider.searchMoviesPaged(query, page);
+    if (scope === "tv") return await tmdbProvider.searchTVPaged(query, page);
+    if (scope === "person") return await tmdbProvider.searchPeoplePaged(query, page);
+    const r = await tmdb.searchMultiPaged(query, page);
+    return {
+      page: r.page,
+      totalPages: r.total_pages,
+      totalResults: r.total_results,
+      results: r.results
+        .map((raw) => {
+          if (raw.media_type === "person") return mapPerson(raw);
+          return mapSearchResult(raw);
+        })
+        .filter((x): x is MediaItem | PersonItem => x !== null),
+    };
+  },
+  async searchMoviesPaged(query, page) {
+    const r = await tmdb.searchMoviesPaged(query, page);
+    return toPaged<MediaItem>(r, (raw) => mapSearchResult({ ...raw, media_type: "movie" }, "movie"));
+  },
+  async searchTVPaged(query, page) {
+    const r = await tmdb.searchTVPaged(query, page);
+    return toPaged<MediaItem>(r, (raw) => mapSearchResult({ ...raw, media_type: "tv" }, "tv"));
+  },
+  async searchPeoplePaged(query, page) {
+    const r = await tmdb.searchPeoplePaged(query, page);
+    return toPaged<PersonItem>(r, mapPerson);
+  },
+  async keywordFallback(query, page) {
+    const keywords = await tmdb.searchKeyword(query);
+    if (keywords.length === 0) {
+      return { page: 1, totalPages: 0, totalResults: 0, results: [] };
+    }
+    const top = keywords[0];
+    const r = await tmdb.discoverByKeyword(top.id, page);
+    return toPaged<MediaItem>(r, (raw) => mapSearchResult({ ...raw, media_type: "movie" }, "movie"));
   },
   async getDetail(type, id) {
     if (type === "movie") {
@@ -160,6 +259,44 @@ const tmdbProvider: MediaProvider = {
     const vids = type === "tv" ? await tmdb.getTVVideos(id) : await tmdb.getMovieVideos(id);
     return tmdb.findTrailerKey(vids);
   },
+  async getPerson(id) {
+    const p = await tmdb.getPersonDetail(id);
+    if (!p) return null;
+    return {
+      id: String(p.id),
+      name: p.name,
+      profileUrl: tmdb.profileUrl(p.profile_path, "h632"),
+      knownForDepartment: p.known_for_department,
+      biography: p.biography || undefined,
+      birthday: p.birthday,
+      deathday: p.deathday,
+      placeOfBirth: p.place_of_birth,
+      alsoKnownAs: p.also_known_as,
+    };
+  },
+  async getPersonCredits(id) {
+    const combined = await tmdb.getPersonCombinedCredits(id);
+    const all: PersonCredit[] = [];
+    for (const c of combined.cast) {
+      const base = mapSearchResult(c);
+      if (!base) continue;
+      all.push({ ...base, character: c.character });
+    }
+    for (const c of combined.crew) {
+      if (c.department !== "Directing" && c.department !== "Writing" && c.department !== "Production") continue;
+      const base = mapSearchResult(c);
+      if (!base) continue;
+      all.push({ ...base, job: c.job });
+    }
+    // Deduplicate by type+id (same title may appear in both cast and crew)
+    const seen = new Set<string>();
+    return all.filter((item) => {
+      const key = `${item.mediaType}-${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  },
   toMovie(item) {
     return {
       imdbID: item.id,
@@ -196,7 +333,14 @@ const tmdbProvider: MediaProvider = {
 
 export const media: MediaProvider = tmdbProvider;
 
-// Build canonical route path for a title
 export function titleHref(type: MediaType, id: string | number): string {
   return `/title/${type}/${id}`;
+}
+
+export function personHref(id: string | number): string {
+  return `/person/${id}`;
+}
+
+export function isPerson(item: MediaItem | PersonItem): item is PersonItem {
+  return "name" in item && !("mediaType" in item);
 }
