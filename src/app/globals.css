@@ -2,16 +2,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cinema-bg: #08080f;
-  --color-cinema-surface: #111119;
-  --color-cinema-card: #16161f;
-  --color-cinema-border: #252530;
-  --color-cinema-text: #e8e8f0;
-  --color-cinema-muted: #8888a0;
+  /* Midnight Cinema palette */
+  --color-cinema-bg: #0a0a14;
+  --color-cinema-surface: #11111f;
+  --color-cinema-card: #15152a;
+  --color-cinema-border: #292943;
+  --color-cinema-text: #ebebf5;
+  --color-cinema-muted: #8a8aab;
   --color-cinema-gold: #f5c518;
   --color-cinema-gold-dark: #c49e10;
-  --color-cinema-purple: #8b5cf6;
-  --color-cinema-purple-dark: #6d28d9;
+  /* "purple" var name kept for back-compat; value now indigo */
+  --color-cinema-purple: #6366f1;
+  --color-cinema-purple-dark: #4338ca;
+  --color-cinema-magenta: #ec4899;
+  --color-cinema-magenta-dark: #be185d;
   --color-cinema-red: #ef4444;
   --color-cinema-green: #22c55e;
   --font-sans: "Inter", system-ui, sans-serif;
@@ -29,16 +33,16 @@ body {
   background: var(--color-cinema-bg);
   color: var(--color-cinema-text);
   font-family: var(--font-sans);
-  /* Premium gradient mesh background */
+  /* Midnight Cinema gradient mesh */
   background-image:
-    radial-gradient(at 12% 4%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
-    radial-gradient(at 85% 0%, rgba(245, 197, 24, 0.05) 0px, transparent 45%),
-    radial-gradient(at 100% 80%, rgba(236, 72, 153, 0.04) 0px, transparent 50%);
+    radial-gradient(at 12% 4%, rgba(99, 102, 241, 0.10) 0px, transparent 50%),
+    radial-gradient(at 88% 8%, rgba(236, 72, 153, 0.07) 0px, transparent 50%),
+    radial-gradient(at 100% 90%, rgba(99, 102, 241, 0.05) 0px, transparent 55%);
   background-attachment: fixed;
 }
 
 ::selection {
-  background: rgba(139, 92, 246, 0.4);
+  background: rgba(99, 102, 241, 0.45);
   color: var(--color-cinema-text);
 }
 
@@ -77,7 +81,11 @@ body {
 }
 
 .gradient-purple {
-  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  background: linear-gradient(135deg, #6366f1, #ec4899);
+}
+
+.gradient-magenta {
+  background: linear-gradient(135deg, #ec4899, #f472b6);
 }
 
 .text-gradient-gold {
@@ -88,10 +96,44 @@ body {
 }
 
 .text-gradient-purple {
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  background: linear-gradient(135deg, #6366f1, #ec4899);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Layered depth shadows */
+.depth-1 {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.depth-2 {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.55),
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(99, 102, 241, 0.10);
+}
+.depth-3 {
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.6),
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 48px rgba(236, 72, 153, 0.08);
+}
+.depth-glow-indigo {
+  box-shadow: 0 0 32px rgba(99, 102, 241, 0.25), 0 0 64px rgba(99, 102, 241, 0.15);
+}
+.depth-glow-magenta {
+  box-shadow: 0 0 32px rgba(236, 72, 153, 0.25), 0 0 64px rgba(236, 72, 153, 0.15);
+}
+
+/* 3D scene primitives */
+.scene-3d {
+  perspective: 1500px;
+  perspective-origin: center;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
 }
 
 /* Animations */
@@ -146,8 +188,8 @@ body {
 .movie-card:hover {
   transform: translateY(-4px);
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.5),
-    0 0 24px rgba(139, 92, 246, 0.18);
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(99, 102, 241, 0.18);
 }
 
 /* Focus styles */

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { motion, useScroll, useTransform } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
 import TrailerModal from "@/components/TrailerModal";
@@ -55,6 +56,10 @@ export default function TitleDetail({ type, id }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const { addToWatchlist, markAsWatched, isInWatchlist, isInWatched, removeFromWatchlist, removeFromWatched, user } = useApp();
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const backdropY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+  const backdropScale = useTransform(scrollYProgress, [0, 1], [1.05, 1.15]);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,17 +166,17 @@ export default function TitleDetail({ type, id }: Props) {
     <>
       <Navbar />
       <main className="min-h-screen pt-16">
-        <div className="relative">
+        <div ref={heroRef} className="relative">
           {backdrop ? (
-            <div className="absolute inset-0 overflow-hidden">
-              <Image src={backdrop} alt="" fill className="object-cover blur-sm opacity-20 scale-105" unoptimized />
-              <div className="absolute inset-0 bg-gradient-to-b from-cinema-bg/60 via-cinema-bg/80 to-cinema-bg" />
-            </div>
+            <motion.div style={{ y: backdropY, scale: backdropScale }} className="absolute inset-0 overflow-hidden">
+              <Image src={backdrop} alt="" fill className="object-cover blur-sm opacity-25" unoptimized />
+              <div className="absolute inset-0 bg-gradient-to-b from-cinema-bg/55 via-cinema-bg/80 to-cinema-bg" />
+            </motion.div>
           ) : (
-            <div className="absolute inset-0 overflow-hidden">
-              <Image src={poster} alt="" fill className="object-cover blur-3xl opacity-15 scale-110" unoptimized />
+            <motion.div style={{ y: backdropY, scale: backdropScale }} className="absolute inset-0 overflow-hidden">
+              <Image src={poster} alt="" fill className="object-cover blur-3xl opacity-20" unoptimized />
               <div className="absolute inset-0 bg-gradient-to-b from-cinema-bg/50 via-cinema-bg/80 to-cinema-bg" />
-            </div>
+            </motion.div>
           )}
 
           <div className="relative max-w-6xl mx-auto px-4 py-12">
@@ -184,7 +189,7 @@ export default function TitleDetail({ type, id }: Props) {
 
             <div className="flex flex-col md:flex-row gap-8 animate-fade-in">
               <div className="flex-shrink-0 w-full md:w-80">
-                <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-cinema-border/30">
+                <div className="relative aspect-[2/3] rounded-2xl overflow-hidden depth-3 border border-cinema-border/30">
                   <Image src={poster} alt={movie.Title} fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover" unoptimized priority />
                 </div>
               </div>

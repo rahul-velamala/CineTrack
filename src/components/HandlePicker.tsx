@@ -45,7 +45,7 @@ export default function HandlePicker() {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 12, opacity: 0, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 360, damping: 28 }}
-            className="w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6"
+            className="w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border depth-3 p-6"
           >
         <div className="text-center space-y-2 mb-5">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl glass mb-2">

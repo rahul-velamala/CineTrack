@@ -312,16 +312,79 @@ Phase 0 needs zero console changes. Safe to start.
 
 ## Status
 
-| Phase | Status |
-|---|---|
-| 0 — Data model + guest-first | ⏳ ready to start |
-| 1 — TV support | pending |
-| 2 — Search page | pending |
-| 3 — Optional auth | pending |
-| 4 — Personal recs | pending |
-| 5 — Trailer upgrade | pending |
-| 6 — Friends | pending |
-| 7 — Creator lists | pending |
-| 8 — UI overhaul | pending |
+| Phase | Status | Commit |
+|---|---|---|
+| 0 — Data model + guest-first | ✅ done | `9198e32` |
+| 1 — TV support | ✅ done | `6238a65` |
+| 2 — Search page | ✅ done | `0e4db93` |
+| 3 — Optional auth | ✅ shipped, **broken in prod** | `4a0de4a` |
+| 4 — Personal recs | ✅ done | `2f13453` |
+| 5 — Trailer upgrade | ✅ done | `b3854f6` |
+| 6 — Friends + inbox | ✅ done | `90d3b24` |
+| 7 — Creator lists | ⏸️ deferred (skip per user) | — |
+| 8 — UI overhaul (motion + lucide + toasts) | ✅ done | `a3f3c03` |
+| **A — Auth fix** | ✅ resolved (console config) | — |
+| **9 — 3D + Midnight Cinema palette** | ✅ done | (this commit) |
 
-Say **go** → I start Phase 0.
+---
+
+## Phase A — Auth fix (blocker)
+
+User reports: Google + Email sign-in **not working** in production.
+
+Most likely causes (in order of probability):
+1. **Firebase Auth providers not enabled in console**
+   - Console → Authentication → Sign-in method → Google = Disabled
+   - Console → Authentication → Sign-in method → Email Link = Disabled
+2. **Authorized domains missing** — Vercel deploy URL not whitelisted
+3. **Firestore rules not republished** — `users/{uid}` create denied
+4. **Popup blocked** — Google sign-in via `signInWithPopup` browser-blocked
+5. **Code bug** — possible but unlikely (build clean)
+
+Debug priority:
+- (a) Get console errors from browser DevTools → console
+- (b) Verify Firebase console state (3 checkboxes)
+- (c) If still broken, swap `signInWithPopup` → `signInWithRedirect` (Safari mobile fails on popup)
+
+---
+
+## Phase 9 — 3D + new color palette
+
+### Color palette options (pick one)
+
+| Option | Vibe | Primary | Accent | Background |
+|---|---|---|---|---|
+| **A. Midnight Cinema** (current refresh) | Premium, cinematic | Deep indigo `#4f46e5` | Electric magenta `#ec4899` | Near-black `#0a0a14` |
+| **B. Neo-Tokyo** | Cyberpunk, neon | Cyan `#06b6d4` | Hot pink `#f472b6` | Charcoal w/ blue tint `#0c0e1a` |
+| **C. Aurora** | Soft premium, modern | Mint `#10b981` | Lavender `#a78bfa` | Slate `#0f172a` |
+| **D. Sunset Vinyl** | Warm, retro premium | Coral `#fb7185` | Amber `#f59e0b` | Warm dark `#1a0f0d` |
+| **E. Custom** | You pick | — | — | — |
+
+**Recommendation:** **B (Neo-Tokyo)** if want truly different. **A (Midnight Cinema)** if want polished evolution. **C (Aurora)** for friendlier mass-market feel.
+
+### 3D scope options (pick subset)
+
+| Effect | Cost | Library | Impact |
+|---|---|---|---|
+| 1. **Tilt cards on hover** (2D mouse-tracked) | Low | CSS only | Big perceived premium |
+| 2. **Parallax hero on scroll** (backdrop slow, foreground fast) | Low | framer-motion `useScroll` | Cinematic feel |
+| 3. **Card stack 3D depth on scroll** | Med | framer-motion | Modern Apple-store feel |
+| 4. **Hero 3D poster carousel** (rotate-Y, perspective) | Med | CSS perspective | Wow factor on landing |
+| 5. **WebGL gradient mesh background** (animated) | Med | shader / `react-three-fiber` | Premium ambient |
+| 6. **Full three.js scene** (movie posters in 3D space) | High | `@react-three/fiber` + `drei` | Heavy bundle, mobile risk |
+| 7. **Glassmorphism layers w/ depth shadows** | Low | CSS only | Subtle premium |
+
+**Recommendation (free-tier + portable + mobile-safe):** **1 + 2 + 4 + 7**. CSS-only or framer-motion. No heavy WebGL deps. Mobile fast.
+
+**Skip 6** for now — three.js bundles ~200KB, mobile perf risk, complex maintenance.
+
+### Phase 9 tasks (after palette + 3D scope chosen)
+
+- [ ] Apply new palette tokens → `globals.css`
+- [ ] Re-skin existing components (cards, modals, buttons, navbar) with new colors
+- [ ] Mouse-tracked tilt on `MovieCard` hover (CSS perspective)
+- [ ] Parallax hero on `/home` (backdrop slower than content)
+- [ ] 3D rotating poster carousel on landing
+- [ ] Layered glass with depth shadows on detail pages
+- [ ] Verify accessibility (contrast ratios, motion-reduced)
+

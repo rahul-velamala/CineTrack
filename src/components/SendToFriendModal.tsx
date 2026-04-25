@@ -72,7 +72,7 @@ export default function SendToFriendModal({ open, onClose, movie }: Props) {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 12, opacity: 0, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 360, damping: 28 }}
-            className="relative w-full max-w-md rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6 max-h-[85vh] flex flex-col"
+            className="relative w-full max-w-md rounded-3xl bg-cinema-card border border-cinema-border depth-3 p-6 max-h-[85vh] flex flex-col"
           >
             <button
               onClick={onClose}

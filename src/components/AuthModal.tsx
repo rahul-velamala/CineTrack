@@ -83,7 +83,7 @@ export default function AuthModal({ open, onClose }: Props) {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 12, opacity: 0, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 360, damping: 28 }}
-            className="relative w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6"
+            className="relative w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border depth-3 p-6"
           >
             <button
               onClick={onClose}
