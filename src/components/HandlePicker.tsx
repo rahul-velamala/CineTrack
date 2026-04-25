@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useApp } from "@/context/AppContext";
 import { validateHandle } from "@/lib/userStore";
 
@@ -9,8 +10,6 @@ export default function HandlePicker() {
   const [raw, setRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  if (!needsHandle) return null;
 
   const v = validateHandle(raw);
   const handlePreview = v.ok ? v.handle : raw.trim().toLowerCase().replace(/^@/, "");
@@ -31,8 +30,23 @@ export default function HandlePicker() {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6 animate-slide-down">
+    <AnimatePresence>
+      {needsHandle && (
+        <motion.div
+          key="handle-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+        >
+          <motion.div
+            initial={{ y: 24, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 12, opacity: 0, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            className="w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6"
+          >
         <div className="text-center space-y-2 mb-5">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl glass mb-2">
             <span className="text-3xl">🏷️</span>
@@ -79,7 +93,9 @@ export default function HandlePicker() {
             Cancel & sign out
           </button>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

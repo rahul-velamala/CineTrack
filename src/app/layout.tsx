@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
+import { ToastProvider } from "@/components/Toast";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -24,7 +25,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} antialiased`}>
         <AppProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </AppProvider>
         <Analytics />
         <SpeedInsights />

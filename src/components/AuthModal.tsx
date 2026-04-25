@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 
 interface Props {
@@ -30,8 +32,6 @@ export default function AuthModal({ open, onClose }: Props) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
-
-  if (!open) return null;
 
   const handleGoogle = async () => {
     setError(null);
@@ -66,23 +66,32 @@ export default function AuthModal({ open, onClose }: Props) {
   };
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6 animate-slide-down"
-      >
-        <button
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="auth-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
           onClick={onClose}
-          aria-label="Close"
-          className="absolute top-3 right-3 p-2 rounded-lg text-cinema-muted hover:text-cinema-text hover:bg-white/5 transition-colors cursor-pointer"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+          <motion.div
+            onClick={(e) => e.stopPropagation()}
+            initial={{ y: 24, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 12, opacity: 0, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            className="relative w-full max-w-sm rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6"
+          >
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute top-3 right-3 p-2 rounded-lg text-cinema-muted hover:text-cinema-text hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
         <div className="text-center space-y-2 mb-6">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl glass mb-2">
@@ -162,7 +171,9 @@ export default function AuthModal({ open, onClose }: Props) {
             </button>
           </div>
         )}
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

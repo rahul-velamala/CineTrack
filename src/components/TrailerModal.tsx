@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import type { VideoItem } from "@/lib/media";
 
 interface Props {
@@ -145,24 +147,35 @@ export default function TrailerModal({ open, onClose, title, videos, initialKey 
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  if (!open || !mounted) return null;
+  if (!mounted) return null;
 
   const src = current
     ? `https://www.youtube.com/embed/${current.key}?autoplay=1&mute=1&rel=0&modestbranding=1&enablejsapi=1&controls=1&playsinline=1`
     : "";
 
   return createPortal(
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-[300] flex flex-col bg-black/90 backdrop-blur-sm animate-fade-in"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${title} videos`}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full h-full flex flex-col"
-      >
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="trailer-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          onClick={onClose}
+          className="fixed inset-0 z-[300] flex flex-col bg-black/90 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${title} videos`}
+        >
+          <motion.div
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            className="w-full h-full flex flex-col"
+          >
         <header className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-white/10 bg-black/40">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-cinema-muted">Videos</p>
@@ -177,9 +190,7 @@ export default function TrailerModal({ open, onClose, title, videos, initialKey 
               aria-label="Close"
               className="p-2 rounded-lg text-cinema-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-5 h-5" />
             </button>
           </div>
         </header>
@@ -261,35 +272,21 @@ export default function TrailerModal({ open, onClose, title, videos, initialKey 
               aria-label="Previous"
               className="p-2 rounded-lg text-cinema-muted hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 cursor-pointer"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={togglePlay}
               aria-label={playing ? "Pause" : "Play"}
               className="p-2 rounded-lg text-cinema-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
-              {playing ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-              )}
+              {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
             <button
               onClick={toggleMute}
               aria-label={muted ? "Unmute" : "Mute"}
               className="p-2 rounded-lg text-cinema-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
-              {muted ? (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15.414A2 2 0 015 14V10a2 2 0 012-2h3l4-4v16l-4-4H7zM17 9l4 4m0-4l-4 4" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15.414A2 2 0 015 14V10a2 2 0 012-2h3l4-4v16l-4-4H7zM15 8a5 5 0 010 8M17.5 5a9 9 0 010 14" />
-                </svg>
-              )}
+              {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
             <button
               onClick={doNext}
@@ -297,14 +294,14 @@ export default function TrailerModal({ open, onClose, title, videos, initialKey 
               aria-label="Next"
               className="p-2 rounded-lg text-cinema-muted hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 cursor-pointer"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
         </footer>
-      </div>
-    </div>,
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body
   );
 }

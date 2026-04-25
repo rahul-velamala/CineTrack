@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
+import { X, Check, Send } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import type { Movie } from "@/context/AppContext";
 import { sendRec, type FriendEdge } from "@/lib/socialStore";
@@ -37,8 +39,6 @@ export default function SendToFriendModal({ open, onClose, movie }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   const send = async () => {
     if (!profile || !selectedUid) return;
     setStatus("sending");
@@ -55,23 +55,32 @@ export default function SendToFriendModal({ open, onClose, movie }: Props) {
   };
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6 animate-slide-down max-h-[85vh] flex flex-col"
-      >
-        <button
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="send-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
           onClick={onClose}
-          aria-label="Close"
-          className="absolute top-3 right-3 p-2 rounded-lg text-cinema-muted hover:text-cinema-text hover:bg-white/5 transition-colors cursor-pointer"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+          <motion.div
+            onClick={(e) => e.stopPropagation()}
+            initial={{ y: 24, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 12, opacity: 0, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            className="relative w-full max-w-md rounded-3xl bg-cinema-card border border-cinema-border shadow-2xl shadow-black/50 p-6 max-h-[85vh] flex flex-col"
+          >
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute top-3 right-3 p-2 rounded-lg text-cinema-muted hover:text-cinema-text hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
         <div className="text-center space-y-1 mb-5">
           <span className="text-3xl inline-block mb-1">📨</span>
@@ -122,9 +131,7 @@ export default function SendToFriendModal({ open, onClose, movie }: Props) {
                           {f.handle && <p className="text-xs text-cinema-purple truncate">@{f.handle}</p>}
                         </div>
                         {selected && (
-                          <svg className="w-5 h-5 text-cinema-purple flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <Check className="w-5 h-5 text-cinema-purple flex-shrink-0" />
                         )}
                       </button>
                     );
@@ -148,15 +155,18 @@ export default function SendToFriendModal({ open, onClose, movie }: Props) {
                 <button
                   onClick={send}
                   disabled={!selectedUid || status === "sending"}
-                  className="w-full py-3 rounded-xl font-semibold text-sm gradient-purple text-white hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm gradient-purple text-white hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
                 >
+                  <Send className="w-4 h-4" />
                   {status === "sending" ? "Sending..." : "Send recommendation"}
                 </button>
               </>
             )}
           </>
         )}
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
