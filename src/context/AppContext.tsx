@@ -15,6 +15,7 @@ import {
   sendEmailLink as doSendEmailLink,
   signOut as doSignOut,
 } from "@/lib/auth";
+import { subscribeFriends, subscribeInbox, type FriendEdge, type InboxRec } from "@/lib/socialStore";
 
 export type MediaType = "movie" | "tv";
 
@@ -56,6 +57,11 @@ interface AppContextType {
   sendEmailLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   claimHandle: (raw: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  // social
+  friends: FriendEdge[];
+  inbox: InboxRec[];
+  incomingCount: number;
+  inboxCount: number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -89,6 +95,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [friends, setFriends] = useState<FriendEdge[]>([]);
+  const [inbox, setInbox] = useState<InboxRec[]>([]);
 
   const isRemoteUpdate = useRef(false);
   const firestoreLoaded = useRef(false);
@@ -108,6 +116,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAuthLoading(false);
       if (!fbUser) {
         setProfile(null);
+        setFriends([]);
+        setInbox([]);
         firestoreLoaded.current = false;
         migrated.current = false;
         return;
@@ -121,6 +131,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     return () => unsub();
   }, []);
+
+  // Social subscriptions (friends + inbox) when authed
+  useEffect(() => {
+    if (!user) return;
+    const unsubFriends = subscribeFriends(user.uid, setFriends);
+    const unsubInbox = subscribeInbox(user.uid, setInbox);
+    return () => {
+      unsubFriends();
+      unsubInbox();
+    };
+  }, [user]);
 
   // When user signs in, migrate local lists into Firestore (one-time), then subscribe
   useEffect(() => {
@@ -236,6 +257,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const needsHandle = !!user && !!profile && !profile.handle;
+  const incomingCount = friends.filter((f) => f.status === "pending_in").length;
+  const inboxCount = inbox.length;
 
   if (!hydrated) {
     return (
@@ -265,6 +288,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         sendEmailLink,
         signOut,
         claimHandle,
+        friends,
+        inbox,
+        incomingCount,
+        inboxCount,
       }}
     >
       {children}

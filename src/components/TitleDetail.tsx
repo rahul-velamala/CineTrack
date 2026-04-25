@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
 import TrailerModal from "@/components/TrailerModal";
+import SendToFriendModal from "@/components/SendToFriendModal";
 import { useApp } from "@/context/AppContext";
 import { media, titleHref, type MediaDetail, type MediaItem, type MediaType, type VideoItem, type WatchProviderInfo } from "@/lib/media";
 
@@ -52,7 +53,8 @@ export default function TitleDetail({ type, id }: Props) {
   const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
   const [providers, setProviders] = useState<WatchProviderInfo | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const { addToWatchlist, markAsWatched, isInWatchlist, isInWatched, removeFromWatchlist, removeFromWatched } = useApp();
+  const [sendOpen, setSendOpen] = useState(false);
+  const { addToWatchlist, markAsWatched, isInWatchlist, isInWatched, removeFromWatchlist, removeFromWatched, user } = useApp();
 
   useEffect(() => {
     let cancelled = false;
@@ -270,6 +272,11 @@ export default function TitleDetail({ type, id }: Props) {
                       <span>✓</span> Watched — Remove
                     </button>
                   )}
+                  {user && (
+                    <button onClick={() => setSendOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm bg-cinema-surface text-cinema-text border border-cinema-border hover:border-cinema-purple/50 transition-all cursor-pointer">
+                      <span>📨</span> Send to friend
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -342,6 +349,12 @@ export default function TitleDetail({ type, id }: Props) {
           title={movie.Title}
           videos={videos}
           initialKey={trailerKey}
+        />
+
+        <SendToFriendModal
+          open={sendOpen}
+          onClose={() => setSendOpen(false)}
+          movie={movie}
         />
 
         <section className="max-w-6xl mx-auto px-4 pb-8">

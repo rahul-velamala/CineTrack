@@ -9,16 +9,21 @@ import HandlePicker from "./HandlePicker";
 import UserMenu from "./UserMenu";
 
 export default function Navbar() {
-  const { watchlist, watched, user, authLoading } = useApp();
+  const { watchlist, watched, user, authLoading, incomingCount, inboxCount } = useApp();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
 
-  const links = [
+  const baseLinks = [
     { href: "/home", label: "Search", icon: "🔍" },
     { href: "/watchlist", label: "Watchlist", count: watchlist.length, icon: "📋" },
     { href: "/watched", label: "Watched", count: watched.length, icon: "✅" },
   ];
+  const authedLinks = [
+    { href: "/friends", label: "Friends", count: incomingCount, icon: "👥" },
+    { href: "/inbox", label: "Inbox", count: inboxCount, icon: "📥" },
+  ];
+  const links = user ? [...baseLinks, ...authedLinks] : baseLinks;
 
   return (
     <>

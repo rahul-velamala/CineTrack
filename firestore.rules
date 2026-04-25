@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // User profiles + watchlist/watched data. Keyed by Firebase Auth uid.
+    // User profiles + watchlist/watched lists. Keyed by Firebase Auth uid.
     // Publicly readable (for friends, creator lists, shared watchlists).
     // Writable only by the owner.
     match /users/{uid} {
@@ -11,15 +11,28 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == uid;
       allow update, delete: if request.auth != null && request.auth.uid == uid;
 
-      // Sub-collections scoped to owner unless otherwise noted.
-      match /{sub=**} {
+      // Friend edges: readable/writable by either party of the edge.
+      match /friends/{friendUid} {
+        allow read, create, update, delete:
+          if request.auth != null
+          && (request.auth.uid == uid || request.auth.uid == friendUid);
+      }
+
+      // Inbox: any authed user may create a rec doc if fromUid matches
+      // their own uid. Only the inbox owner may read, update, or delete.
+      match /inbox/{recId} {
+        allow read, update, delete: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null
+                      && request.resource.data.fromUid == request.auth.uid;
+      }
+
+      // Everything else under /users/{uid} is owner-only.
+      match /{other=**} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
     }
 
     // Handle registry: handles/{handle} -> { uid, claimedAt }
-    // Publicly readable for @handle → uid resolution.
-    // Writable only when creating/releasing your own handle.
     match /handles/{handle} {
       allow read: if true;
       allow create: if request.auth != null
