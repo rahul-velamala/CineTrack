@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 import { ToastProvider } from "@/components/Toast";
+import GuestSavePrompt from "@/components/GuestSavePrompt";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -27,6 +28,7 @@ export default function RootLayout({
         <AppProvider>
           <ToastProvider>
             {children}
+            <GuestSavePrompt />
           </ToastProvider>
         </AppProvider>
         <Analytics />

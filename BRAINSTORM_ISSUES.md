@@ -302,11 +302,89 @@ After phases 10-12: pause for feedback. Then prioritize from this doc based on r
 
 ---
 
+## 16. Instagram virality + mutuals strategy
+
+User intends to push CineTrack on Instagram. Network growth needs viral loops. Two main loops to design for:
+
+### Loop A — Profile-share loop (one-to-many, casual)
+```
+User → posts CineTrack profile link to Insta story / bio
+     → followers tap link
+     → land on /u/[handle] (public)
+     → see the user's avatar, top picks, watchlist preview
+     → CTA: "Make your own list"
+     → guest sign-up
+```
+
+### Loop B — Friend-network loop (many-to-many, dense)
+```
+User invites 5 friends → each invites 5 of theirs
+                       → mutual-friend density grows
+                       → app becomes habit-forming via friend activity
+```
+
+Loop B retains. Loop A acquires. Build for both.
+
+### What this means for product
+
+| # | Tactic | Effort | Loop |
+|---|--------|--------|------|
+| 16.1 | **Public profile is shareable + screenshot-friendly** — `/u/[handle]` with avatar, name, top-5 pinned movies, watch count, member-since, optional bio. Mobile-first, great-looking | M | A |
+| 16.2 | **OG meta tags on profile + lists** — `og:image`, `og:title`, `og:description` so links preview well on Insta DM, WhatsApp, Twitter. Generate dynamic OG image with poster grid + handle (Vercel OG, removable, free) | M | A |
+| 16.3 | **QR code on profile** — server-rendered SVG QR for `/u/[handle]?invite=1`. Insta story sticker uses screenshot of profile w/ QR. Friend at meetup scans. | S | Both |
+| 16.4 | **Story-sticker generator** — "My top 5 movies of 2026" downloadable as PNG (1080x1920 Instagram story format). Posters + handle + brand watermark. Free Canva-style API: `html2canvas` client-side | M | A |
+| 16.5 | **Year-in-review summary** — Spotify-Wrapped style reel. "You watched 47 movies in 2026, top genre was Sci-Fi, longest movie was Oppenheimer..." Shareable to Insta. Annual viral moment. | M | A |
+| 16.6 | **Invite-link tracking** — `?invite=@rahul` query → on signup, tag user with `invitedBy: rahulUid`. Show "Invited by @rahul" badge for first 30 days. Optional small reward / mutual auto-suggestion | S | B |
+| 16.7 | **Mutual friends signal** — when adding by handle: "@priya · 3 mutuals (@a, @b, @c)" → social proof prevents wrong-handle send | M | B |
+| 16.8 | **People-you-may-know feed** — `/friends/discover` lists friends-of-friends ranked by mutual-count. Surface top 5 on /friends page. | M | B |
+| 16.9 | **Activity feed** (privacy-controlled) — "@priya watched Inception", "@kiran added 3 movies". Drives daily-return habit. Privacy: opt-in, friends-only by default. | M | B |
+| 16.10 | **First-touch onboarding for invite landings** — if user lands via `?invite=...` → show "Welcome! @rahul invited you. Try it as a guest, then sign in to friend them." Skip the cold start. | S | A |
+| 16.11 | **One-tap copy of profile link** — button on own profile w/ confetti micro-anim. Native `navigator.share` API on mobile (WhatsApp, Insta share sheet) | S | A |
+| 16.12 | **Instagram bio link page** — `/u/[handle]/links` simple linktree-alt. User can put `cinetrack.app/u/@rahul/links` in IG bio with curated movie collection | M | A |
+| 16.13 | **Leaderboard / referral counter** — "You've invited X friends. Top inviters this month: @rahul (12)" — gamifies organic spread | M | B |
+| 16.14 | **Private "circle" mode** — beyond friends, lighter "follow" relationship for discovering taste-twins without committing to friend status | L | B |
+
+### Mutual friends — implementation sketch
+
+When user A views profile of user B (or types @b in friend search):
+
+```
+mutuals(A, B) = friends(A) ∩ friends(B) where status === "accepted"
+```
+
+Currently each user's friends are at `users/{uid}/friends/{otherUid}` — readable by either party. Computing intersection requires reading both lists. Free-tier Firestore: 50k reads/day. For 100 active users × 10 profile views × 2 lookups = 2k reads/day. Fine.
+
+To avoid N+1 pattern:
+- Cache mutuals client-side once both lists loaded
+- For deep social features (suggestions feed) consider precomputing on Cloud Function trigger when friend-edge changes — defer until needed
+
+### Privacy guard
+
+Default profile visibility: **public** (per virality goals) but **always visible to user**: a "Public profile" toggle in settings, default ON. Private mode disables `/u/[handle]` (404 for non-friends), still discoverable by handle to send-friend-request only.
+
+Watchlist visibility = separate toggle. Public profile + private watchlist is a valid combo (user wants to be findable but not show taste).
+
+### Phase sequencing for virality
+
+Priority recommendation:
+1. **Public profile pages** (16.1) — must exist before any sharing. Bundles with Phase 10.
+2. **OG meta tags** (16.2) — cheap, big payoff. Add same phase.
+3. **Mutuals signal in friend search** (16.7) — fixes wrong-handle problem user flagged.
+4. **Invite link tracking + welcome experience** (16.6, 16.10) — turns shared links into measurable activations.
+5. **QR code + share button** (16.3, 16.11) — reduces friction for in-person + IG story sharing.
+6. **Year-in-review** (16.5) — biggest viral moment, ship before Dec.
+7. **Activity feed + suggestions** (16.8, 16.9) — retention + density. Phase 11+.
+
+Don't ship 16.5 (Year-in-review) and 16.13 (leaderboard) until you have user volume — they're empty without data.
+
+---
+
 ## Items that need user decision (need your input)
 
-- **Privacy default:** profile public or private out of the box?
+- **Privacy default:** profile public (recommended for virality) or private out of the box?
 - **Chat scope:** text-only MVP or also images at launch?
 - **Handle change cooldown:** 30 days OK?
 - **Notification channel:** web push only, or also email digest?
 - **Onboarding 5 favorites:** required or skippable?
 - **Rating system:** stars, thumbs, or 1-10 scale?
+- **Activity feed:** opt-in (default off) or opt-out (default on)? — affects friend discovery vs privacy

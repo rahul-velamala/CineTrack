@@ -2,6 +2,7 @@
 
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
+import GuestBanner from "@/components/GuestBanner";
 import { useApp } from "@/context/AppContext";
 import Link from "next/link";
 
@@ -13,6 +14,7 @@ export default function WatchedPage() {
       <Navbar />
       <main className="min-h-screen pt-16">
         <div className="max-w-6xl mx-auto px-4 py-12">
+          <GuestBanner variant="watched" />
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>

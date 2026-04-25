@@ -62,12 +62,26 @@ interface AppContextType {
   inbox: InboxRec[];
   incomingCount: number;
   inboxCount: number;
+  // guest tracking
+  guestAdds: number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const WATCHLIST_KEY = "cinetrack_watchlist";
 const WATCHED_KEY = "cinetrack_watched";
+const GUEST_ADDS_KEY = "cinetrack_guest_adds";
+
+function loadGuestAdds(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(GUEST_ADDS_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
 
 function normalize(m: Movie): Movie {
   return { ...m, mediaType: m.mediaType ?? "movie" };
@@ -97,15 +111,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [friends, setFriends] = useState<FriendEdge[]>([]);
   const [inbox, setInbox] = useState<InboxRec[]>([]);
+  const [guestAdds, setGuestAdds] = useState(0);
 
   const isRemoteUpdate = useRef(false);
   const firestoreLoaded = useRef(false);
   const migrated = useRef(false);
+  const userRef = useRef<User | null>(null);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
     setWatchlist(loadList(WATCHLIST_KEY));
     setWatched(loadList(WATCHED_KEY));
+    setGuestAdds(loadGuestAdds());
     setHydrated(true);
   }, []);
 
@@ -212,10 +229,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDoc(doc(db, "users", user.uid), { watched }, { merge: true }).catch(console.error);
   }, [watched, hydrated, user]);
 
+  // Keep ref in sync for callbacks
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  const bumpGuestAdds = useCallback(() => {
+    if (userRef.current) return;
+    setGuestAdds((n) => {
+      const next = n + 1;
+      try { localStorage.setItem(GUEST_ADDS_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
   const addToWatchlist = useCallback((movie: Movie) => {
     const m = normalize(movie);
-    setWatchlist((prev) => (prev.some((x) => x.imdbID === m.imdbID) ? prev : [...prev, m]));
-  }, []);
+    setWatchlist((prev) => {
+      if (prev.some((x) => x.imdbID === m.imdbID)) return prev;
+      bumpGuestAdds();
+      return [...prev, m];
+    });
+  }, [bumpGuestAdds]);
 
   const removeFromWatchlist = useCallback((id: string) => {
     setWatchlist((prev) => prev.filter((m) => m.imdbID !== id));
@@ -224,8 +257,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const markAsWatched = useCallback((movie: Movie) => {
     const m = normalize(movie);
     setWatchlist((prev) => prev.filter((x) => x.imdbID !== m.imdbID));
-    setWatched((prev) => (prev.some((x) => x.imdbID === m.imdbID) ? prev : [...prev, m]));
-  }, []);
+    setWatched((prev) => {
+      if (prev.some((x) => x.imdbID === m.imdbID)) return prev;
+      bumpGuestAdds();
+      return [...prev, m];
+    });
+  }, [bumpGuestAdds]);
 
   const removeFromWatched = useCallback((id: string) => {
     setWatched((prev) => prev.filter((m) => m.imdbID !== id));
@@ -292,6 +329,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         inbox,
         incomingCount,
         inboxCount,
+        guestAdds,
       }}
     >
       {children}
