@@ -325,7 +325,7 @@ Phase 0 needs zero console changes. Safe to start.
 | 8 — UI overhaul (motion + lucide + toasts) | ✅ done | `a3f3c03` |
 | **A — Auth fix** | ✅ resolved (console config) | — |
 | **9 — 3D + Midnight Cinema palette** | ✅ done | `65058a5` |
-| **9.1 — Guest data-loss UX + CLAUDE.md + Insta strategy** | ✅ done | (this commit) |
+| **9.1 — Guest data-loss UX + CLAUDE.md + Insta strategy** | ✅ done | `a86b011` |
 | **10 — Friend discovery overhaul + public profiles** | ⏳ planned | — |
 | **11 — Chat MVP** | ⏳ planned | — |
 
