@@ -156,7 +156,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
             Add me on CineTrack
           </div>
           <div style={{ fontSize: 24, color: "#8a8aab", display: "flex" }}>
-            cinetrack.vercel.app/?invite=@{handle}
+            cinetrack.vercel.app/add/{handle}
           </div>
         </div>
       </div>

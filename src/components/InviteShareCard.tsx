@@ -23,7 +23,9 @@ export default function InviteShareCard({ handle, variant = "full" }: Props) {
   const [downloadingSticker, setDownloadingSticker] = useState(false);
 
   const profileUrl = `${siteOrigin()}/u/${handle}`;
-  const inviteUrl = `${siteOrigin()}/?invite=${encodeURIComponent(handle)}`;
+  // Primary share URL = direct add-friend deep link (faster conversion).
+  // Legacy ?invite= URLs still resolve for backward compat.
+  const inviteUrl = `${siteOrigin()}/add/${encodeURIComponent(handle)}`;
   const linksUrl = `${siteOrigin()}/u/${handle}/links`;
 
   const copyInvite = async () => {
@@ -100,7 +102,7 @@ export default function InviteShareCard({ handle, variant = "full" }: Props) {
         <div>
           <h3 className="text-sm font-semibold text-cinema-text">Share your profile</h3>
           <p className="text-[11px] text-cinema-muted mt-0.5">
-            Friends who tap your invite link land here and can add you in one tap.
+            Friends who tap your link land on a one-tap &ldquo;Add as friend&rdquo; page.
           </p>
         </div>
       </div>

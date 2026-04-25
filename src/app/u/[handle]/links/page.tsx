@@ -88,9 +88,7 @@ export default function BioLinksPage() {
   // Top picks: for now, last 5 from watchlist (most recently added)
   const topPicks = watchlistPublic ? data.watchlist.slice(-6).reverse() : [];
 
-  const inviteUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/?invite=${encodeURIComponent(p.handle ?? "")}`
-    : `/?invite=${encodeURIComponent(p.handle ?? "")}`;
+  const inviteUrl = `/add/${encodeURIComponent(p.handle ?? "")}`;
 
   return (
     <>
