@@ -324,7 +324,7 @@ Phase 0 needs zero console changes. Safe to start.
 | 7 — Creator lists | ⏸️ deferred (skip per user) | — |
 | 8 — UI overhaul (motion + lucide + toasts) | ✅ done | `a3f3c03` |
 | **A — Auth fix** | ✅ resolved (console config) | — |
-| **9 — 3D + Midnight Cinema palette** | ✅ done | (this commit) |
+| **9 — 3D + Midnight Cinema palette** | ✅ done | `65058a5` |
 
 ---
 
