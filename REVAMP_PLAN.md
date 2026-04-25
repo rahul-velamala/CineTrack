@@ -326,7 +326,7 @@ Phase 0 needs zero console changes. Safe to start.
 | **A — Auth fix** | ✅ resolved (console config) | — |
 | **9 — 3D + Midnight Cinema palette** | ✅ done | `65058a5` |
 | **9.1 — Guest data-loss UX + CLAUDE.md + Insta strategy** | ✅ done | `a86b011` |
-| **10a — Public profiles + Settings + non-blocking handle** | ✅ done | (this commit) |
+| **10a — Public profiles + Settings + non-blocking handle** | ✅ done | `9c00584` |
 | **10b — Friend discovery (preview, mutuals, invite tracking)** | ⏳ planned | — |
 | **10c — Share button + QR + bio-link page** | ⏳ planned | — |
 | **11 — Chat MVP (text + images)** | ⏳ planned | — |
