@@ -9,6 +9,7 @@ import { UserPlus, Check, Hourglass, X, Lock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
 import AuthModal from "@/components/AuthModal";
+import InviteShareCard from "@/components/InviteShareCard";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/components/Toast";
 import { titleHref } from "@/lib/media";
@@ -246,6 +247,13 @@ export default function PublicProfilePage() {
               </div>
             </div>
           </div>
+
+          {/* Self-only: invite share card */}
+          {isSelf && p.handle && (
+            <div className="mt-6">
+              <InviteShareCard handle={p.handle} />
+            </div>
+          )}
 
           {/* Visibility notice */}
           {profileHidden && (

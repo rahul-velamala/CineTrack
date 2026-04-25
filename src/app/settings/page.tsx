@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
+import InviteShareCard from "@/components/InviteShareCard";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/components/Toast";
 import {
@@ -241,6 +242,12 @@ export default function SettingsPage() {
               {savingProfile ? "Saving..." : "Save changes"}
             </button>
           </div>
+
+          {profile?.handle && (
+            <Section title="Share your profile">
+              <InviteShareCard handle={profile.handle} />
+            </Section>
+          )}
 
           <Section title="Change handle">
             {profile?.handle ? (

@@ -12,9 +12,22 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://cinetrack.vercel.app";
+
 export const metadata: Metadata = {
-  title: "CineTrack — Movie Watchlist",
-  description: "Discover, track, and manage your movie watchlist. Search Bollywood & Hollywood movies, watch trailers, and keep track of what you've watched.",
+  metadataBase: new URL(SITE_URL),
+  title: "CineTrack — Track movies & TV with friends",
+  description: "Free, premium movie & TV tracker. Build your watchlist, watch trailers, send recs to friends. Bollywood, Hollywood & more.",
+  openGraph: {
+    title: "CineTrack — Track movies & TV with friends",
+    description: "Free, premium movie & TV tracker. Build your watchlist, watch trailers, send recs to friends.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CineTrack — Track movies & TV with friends",
+    description: "Free, premium movie & TV tracker.",
+  },
 };
 
 export default function RootLayout({
