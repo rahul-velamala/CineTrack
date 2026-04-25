@@ -11,9 +11,18 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == uid;
       allow update, delete: if request.auth != null && request.auth.uid == uid;
 
-      // Friend edges: readable/writable by either party of the edge.
+      // Friend edges:
+      //  - Pending or blocked edges = visible only to either party
+      //  - Accepted edges = readable by any authed user (powers mutuals
+      //    + friends-of-friends discovery; profile graph already public)
+      // Writes always restricted to either party of the edge.
       match /friends/{friendUid} {
-        allow read, create, update, delete:
+        allow read: if request.auth != null && (
+          request.auth.uid == uid
+          || request.auth.uid == friendUid
+          || resource.data.status == "accepted"
+        );
+        allow create, update, delete:
           if request.auth != null
           && (request.auth.uid == uid || request.auth.uid == friendUid);
       }

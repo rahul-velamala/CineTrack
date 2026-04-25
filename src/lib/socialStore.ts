@@ -3,12 +3,15 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
   orderBy,
+  limit,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -203,4 +206,117 @@ export async function sendRec(params: SendRecParams): Promise<void> {
 
 export async function deleteInboxRec(uid: string, recId: string): Promise<void> {
   await deleteDoc(doc(db, "users", uid, "inbox", recId));
+}
+
+// --- Mutuals + Friends-of-Friends ---
+
+const MUTUALS_TTL_MS = 5 * 60 * 1000; // 5 min
+const mutualsCache = new Map<string, { uids: string[]; ts: number }>();
+
+export async function getAcceptedFriendUids(uid: string): Promise<string[]> {
+  const cached = mutualsCache.get(uid);
+  if (cached && Date.now() - cached.ts < MUTUALS_TTL_MS) return cached.uids;
+  try {
+    const q = query(collection(db, "users", uid, "friends"), where("status", "==", "accepted"), limit(500));
+    const snap = await getDocs(q);
+    const uids = snap.docs.map((d) => d.id);
+    mutualsCache.set(uid, { uids, ts: Date.now() });
+    return uids;
+  } catch (err) {
+    console.error("getAcceptedFriendUids failed", err);
+    return [];
+  }
+}
+
+export function invalidateMutualsCache(uid?: string) {
+  if (uid) mutualsCache.delete(uid);
+  else mutualsCache.clear();
+}
+
+export async function computeMutuals(selfFriends: FriendEdge[], otherUid: string): Promise<string[]> {
+  const myAccepted = new Set(selfFriends.filter((f) => f.status === "accepted").map((f) => f.uid));
+  if (myAccepted.size === 0) return [];
+  const otherAccepted = await getAcceptedFriendUids(otherUid);
+  const mutual: string[] = [];
+  for (const uid of otherAccepted) {
+    if (myAccepted.has(uid)) mutual.push(uid);
+  }
+  return mutual;
+}
+
+export interface FriendSuggestion {
+  uid: string;
+  handle?: string;
+  displayName?: string;
+  photoURL?: string;
+  mutualCount: number;
+  mutualUids: string[];   // first 3 mutual uids for display
+  viaHandles: string[];   // first 3 friends who introduce this suggestion
+}
+
+interface SuggestionParams {
+  selfUid: string;
+  selfFriends: FriendEdge[];
+  maxResults?: number;
+  perFriendLimit?: number;
+}
+
+export async function getSuggestedFriends({
+  selfUid,
+  selfFriends,
+  maxResults = 12,
+  perFriendLimit = 30,
+}: SuggestionParams): Promise<FriendSuggestion[]> {
+  const accepted = selfFriends.filter((f) => f.status === "accepted");
+  if (accepted.length === 0) return [];
+
+  // Track everyone you already know to skip them
+  const knownUids = new Set<string>([selfUid]);
+  for (const f of selfFriends) knownUids.add(f.uid); // friends + pending + blocked
+
+  const counts = new Map<string, { count: number; mutualUids: string[]; viaHandles: string[] }>();
+
+  await Promise.all(accepted.slice(0, 25).map(async (f) => {
+    try {
+      const q = query(collection(db, "users", f.uid, "friends"), where("status", "==", "accepted"), limit(perFriendLimit));
+      const snap = await getDocs(q);
+      snap.forEach((d) => {
+        if (knownUids.has(d.id)) return;
+        const entry = counts.get(d.id) || { count: 0, mutualUids: [], viaHandles: [] };
+        entry.count++;
+        if (entry.mutualUids.length < 3) entry.mutualUids.push(f.uid);
+        if (entry.viaHandles.length < 3 && f.handle) entry.viaHandles.push(f.handle);
+        counts.set(d.id, entry);
+      });
+    } catch (err) {
+      console.error(`FoF read failed for ${f.uid}`, err);
+    }
+  }));
+
+  // Sort by mutual count, take top N
+  const top = [...counts.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, maxResults);
+
+  // Hydrate basic profile info for each
+  const results = await Promise.all(top.map(async ([uid, info]) => {
+    try {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      if (!userSnap.exists()) return null;
+      const data = userSnap.data() as { handle?: string; displayName?: string; photoURL?: string; profileVisibility?: string };
+      // Skip private profiles
+      if (data.profileVisibility === "private") return null;
+      return {
+        uid,
+        handle: data.handle,
+        displayName: data.displayName,
+        photoURL: data.photoURL,
+        mutualCount: info.count,
+        mutualUids: info.mutualUids,
+        viaHandles: info.viaHandles,
+      } as FriendSuggestion;
+    } catch {
+      return null;
+    }
+  }));
+
+  return results.filter((x): x is FriendSuggestion => x !== null);
 }

@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import MovieCard from "@/components/MovieCard";
 import Poster3DStrip from "@/components/Poster3DStrip";
+import InviteWelcome from "@/components/InviteWelcome";
 import { media, titleHref, type MediaItem } from "@/lib/media";
 import { useApp } from "@/context/AppContext";
 import { computePersonalRecs } from "@/lib/recommendations";
@@ -69,6 +70,7 @@ export default function HomePage() {
     <>
       <Navbar />
       <main className="min-h-screen pt-16">
+        <InviteWelcome />
         <section ref={heroRef} className="relative pt-20 pb-10 px-4 overflow-hidden">
           {/* Parallax backdrop blobs */}
           <motion.div

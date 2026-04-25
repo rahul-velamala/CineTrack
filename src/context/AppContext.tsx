@@ -16,6 +16,7 @@ import {
   signOut as doSignOut,
 } from "@/lib/auth";
 import { subscribeFriends, subscribeInbox, type FriendEdge, type InboxRec } from "@/lib/socialStore";
+import { attachInviteOnSignIn, captureInviteFromUrl } from "@/lib/inviteTracking";
 
 export type MediaType = "movie" | "tv";
 
@@ -123,6 +124,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setWatchlist(loadList(WATCHLIST_KEY));
     setWatched(loadList(WATCHED_KEY));
     setGuestAdds(loadGuestAdds());
+    captureInviteFromUrl();
     setHydrated(true);
   }, []);
 
@@ -142,6 +144,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const p = await ensureUserDoc(fbUser);
         setProfile(p);
+        // Attach pending invite (one-time, no-op if none)
+        attachInviteOnSignIn(fbUser.uid).catch((err) => console.error("attachInvite failed", err));
       } catch (err) {
         console.error("ensureUserDoc failed", err);
       }

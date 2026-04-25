@@ -1,33 +1,57 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import HandleResolver from "@/components/HandleResolver";
 import { useApp } from "@/context/AppContext";
+import { useToast } from "@/components/Toast";
 import {
   acceptFriendRequest,
   cancelOutgoingRequest,
+  getSuggestedFriends,
   rejectFriendRequest,
-  resolveHandle,
   sendFriendRequest,
   unfriend,
   type FriendEdge,
+  type FriendSuggestion,
 } from "@/lib/socialStore";
+import type { UserProfile } from "@/lib/userStore";
 
-type Tab = "friends" | "incoming" | "outgoing";
+type Tab = "friends" | "incoming" | "outgoing" | "discover";
 
 export default function FriendsPage() {
   const { user, profile, friends, authLoading } = useApp();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("friends");
-  const [query, setQuery] = useState("");
-  const [searchStatus, setSearchStatus] = useState<"idle" | "searching" | "sending">("idle");
-  const [searchMessage, setSearchMessage] = useState<string | null>(null);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<FriendSuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
 
   const accepted = useMemo(() => friends.filter((f) => f.status === "accepted"), [friends]);
   const incoming = useMemo(() => friends.filter((f) => f.status === "pending_in"), [friends]);
   const outgoing = useMemo(() => friends.filter((f) => f.status === "pending_out"), [friends]);
+
+  // Load suggestions on demand (when discover tab opened OR friends list changes)
+  const acceptedSig = accepted.map((f) => f.uid).join(",");
+  useEffect(() => {
+    if (!user || tab !== "discover") return;
+    if (accepted.length === 0) { setSuggestions([]); return; }
+    let cancelled = false;
+    async function load() {
+      setSuggestLoading(true);
+      try {
+        const res = await getSuggestedFriends({ selfUid: user!.uid, selfFriends: friends, maxResults: 12 });
+        if (!cancelled) setSuggestions(res);
+      } finally {
+        if (!cancelled) setSuggestLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, tab, acceptedSig]);
 
   if (authLoading) {
     return (
@@ -48,46 +72,21 @@ export default function FriendsPage() {
           <div className="max-w-xl mx-auto px-4 py-24 text-center space-y-4">
             <span className="text-5xl">👥</span>
             <h1 className="text-2xl font-bold font-[family-name:var(--font-display)]">Sign in to connect</h1>
-            <p className="text-cinema-muted text-sm">
-              Friends let you send movies and shows to each other. Sign in with Google or email link.
-            </p>
-            <Link href="/home" className="inline-block mt-4 px-6 py-3 rounded-xl font-semibold text-sm gradient-purple text-white hover:opacity-90 transition-all">
-              Back to home
-            </Link>
+            <p className="text-cinema-muted text-sm">Friends let you send movies and shows to each other.</p>
+            <Link href="/home" className="inline-block mt-4 px-6 py-3 rounded-xl font-semibold text-sm gradient-purple text-white hover:opacity-90 transition-all">Back to home</Link>
           </div>
         </main>
       </>
     );
   }
 
-  const handleSend = async () => {
-    setSearchError(null);
-    setSearchMessage(null);
-    const raw = query.trim().replace(/^@/, "");
-    if (!raw) { setSearchError("Enter a handle."); return; }
-    if (profile.handle && raw.toLowerCase() === profile.handle.toLowerCase()) {
-      setSearchError("That's you.");
-      return;
-    }
-    setSearchStatus("searching");
-    const target = await resolveHandle(raw);
-    if (!target) {
-      setSearchStatus("idle");
-      setSearchError(`No user with handle @${raw.toLowerCase()}.`);
-      return;
-    }
-    setSearchStatus("sending");
+  const onSend = async (target: UserProfile) => {
     const res = await sendFriendRequest(profile, target);
-    setSearchStatus("idle");
-    if (res.ok) {
-      setSearchMessage(`Request sent to @${target.handle}.`);
-      setQuery("");
-    } else {
-      setSearchError(res.error);
-    }
+    if (res.ok) toast.success(`Request sent to @${target.handle}`);
+    else toast.error(res.error);
   };
 
-  const list: FriendEdge[] = tab === "friends" ? accepted : tab === "incoming" ? incoming : outgoing;
+  const list: FriendEdge[] = tab === "friends" ? accepted : tab === "incoming" ? incoming : tab === "outgoing" ? outgoing : [];
 
   return (
     <>
@@ -108,35 +107,15 @@ export default function FriendsPage() {
 
           <div className="mb-8 p-5 rounded-2xl bg-cinema-card/60 border border-cinema-border/40">
             <h2 className="text-sm font-semibold text-cinema-text mb-3">Add a friend by handle</h2>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-cinema-muted">@</span>
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); setSearchError(null); setSearchMessage(null); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-                  placeholder="friendhandle"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-cinema-surface border border-cinema-border text-cinema-text placeholder:text-cinema-muted/60 text-sm focus:outline-none focus:border-cinema-purple focus:ring-1 focus:ring-cinema-purple/50"
-                />
-              </div>
-              <button
-                onClick={handleSend}
-                disabled={searchStatus !== "idle" || !query.trim()}
-                className="px-6 py-3 rounded-xl font-semibold text-sm gradient-purple text-white hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
-              >
-                {searchStatus === "sending" ? "Sending..." : searchStatus === "searching" ? "Finding..." : "Send request"}
-              </button>
-            </div>
-            {searchError && <p className="text-cinema-red text-xs mt-2">{searchError}</p>}
-            {searchMessage && <p className="text-cinema-green text-xs mt-2">{searchMessage}</p>}
+            <HandleResolver selfFriends={friends} selfUid={user.uid} onSend={onSend} />
           </div>
 
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex flex-wrap items-center gap-2 mb-6">
             {([
               { k: "friends" as Tab, label: "Friends", count: accepted.length },
               { k: "incoming" as Tab, label: "Incoming", count: incoming.length },
               { k: "outgoing" as Tab, label: "Outgoing", count: outgoing.length },
+              { k: "discover" as Tab, label: "Discover", count: 0 },
             ]).map((t) => (
               <button
                 key={t.k}
@@ -157,13 +136,21 @@ export default function FriendsPage() {
             ))}
           </div>
 
-          {list.length === 0 ? (
+          {tab === "discover" ? (
+            <DiscoverPanel
+              loading={suggestLoading}
+              suggestions={suggestions}
+              friends={friends}
+              hasFriends={accepted.length > 0}
+              onSend={onSend}
+            />
+          ) : list.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
               <span className="text-4xl">
                 {tab === "friends" ? "🤝" : tab === "incoming" ? "📥" : "📤"}
               </span>
               <p className="text-cinema-muted text-sm">
-                {tab === "friends" ? "No friends yet. Send a request above." : tab === "incoming" ? "No incoming requests." : "No outgoing requests."}
+                {tab === "friends" ? "No friends yet. Add by handle or check Discover." : tab === "incoming" ? "No incoming requests." : "No outgoing requests."}
               </p>
             </div>
           ) : (
@@ -191,15 +178,29 @@ function FriendRow({ edge, selfUid, tab }: { edge: FriendEdge; selfUid: string; 
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl bg-cinema-card/60 border border-cinema-border/40">
-      <div className="relative w-11 h-11 rounded-full overflow-hidden bg-cinema-purple/30 flex items-center justify-center flex-shrink-0">
-        {edge.photoURL ? (
-          <Image src={edge.photoURL} alt={displayName} fill sizes="44px" className="object-cover" unoptimized />
-        ) : (
-          <span className="text-sm font-bold text-white">{initials}</span>
-        )}
-      </div>
+      {edge.handle ? (
+        <Link href={`/u/${edge.handle}`} className="relative w-11 h-11 rounded-full overflow-hidden bg-cinema-purple/30 flex items-center justify-center flex-shrink-0">
+          {edge.photoURL ? (
+            <Image src={edge.photoURL} alt={displayName} fill sizes="44px" className="object-cover" unoptimized />
+          ) : (
+            <span className="text-sm font-bold text-white">{initials}</span>
+          )}
+        </Link>
+      ) : (
+        <div className="relative w-11 h-11 rounded-full overflow-hidden bg-cinema-purple/30 flex items-center justify-center flex-shrink-0">
+          {edge.photoURL ? (
+            <Image src={edge.photoURL} alt={displayName} fill sizes="44px" className="object-cover" unoptimized />
+          ) : (
+            <span className="text-sm font-bold text-white">{initials}</span>
+          )}
+        </div>
+      )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-cinema-text truncate">{displayName}</p>
+        {edge.handle ? (
+          <Link href={`/u/${edge.handle}`} className="text-sm font-semibold text-cinema-text hover:text-cinema-purple truncate block">{displayName}</Link>
+        ) : (
+          <p className="text-sm font-semibold text-cinema-text truncate">{displayName}</p>
+        )}
         {edge.handle && <p className="text-xs text-cinema-purple truncate">@{edge.handle}</p>}
       </div>
       <div className="flex items-center gap-2">
@@ -216,6 +217,134 @@ function FriendRow({ edge, selfUid, tab }: { edge: FriendEdge; selfUid: string; 
           <button onClick={doUnfriend} disabled={busy} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cinema-red/15 text-cinema-red border border-cinema-red/30 hover:bg-cinema-red/25 disabled:opacity-50 cursor-pointer">Unfriend</button>
         )}
       </div>
+    </div>
+  );
+}
+
+function DiscoverPanel({
+  loading, suggestions, friends, hasFriends, onSend,
+}: {
+  loading: boolean;
+  suggestions: FriendSuggestion[];
+  friends: FriendEdge[];
+  hasFriends: boolean;
+  onSend: (target: UserProfile) => Promise<void>;
+}) {
+  if (!hasFriends) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+        <span className="text-4xl">🌱</span>
+        <p className="text-cinema-muted text-sm">Add at least one friend to unlock people-you-may-know suggestions.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-20 rounded-xl skeleton" />
+        ))}
+      </div>
+    );
+  }
+
+  if (suggestions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+        <span className="text-4xl">🤔</span>
+        <p className="text-cinema-muted text-sm">No suggestions right now. Your friends&apos; circles haven&apos;t added many people yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-cinema-muted mb-3">People who share friends with you. More mutuals = stronger connection.</p>
+      {suggestions.map((s) => (
+        <SuggestionRow key={s.uid} suggestion={s} friends={friends} onSend={onSend} />
+      ))}
+    </div>
+  );
+}
+
+function SuggestionRow({
+  suggestion, friends, onSend,
+}: {
+  suggestion: FriendSuggestion;
+  friends: FriendEdge[];
+  onSend: (target: UserProfile) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const initials = (suggestion.displayName || suggestion.handle || "?").slice(0, 2).toUpperCase();
+
+  const handleAdd = async () => {
+    setBusy(true);
+    try {
+      await onSend({ uid: suggestion.uid, handle: suggestion.handle, displayName: suggestion.displayName, photoURL: suggestion.photoURL });
+      setSent(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Resolve mutual handles via own friends list
+  const mutualHandles = suggestion.viaHandles.length > 0
+    ? suggestion.viaHandles.slice(0, 3).map((h) => `@${h}`)
+    : suggestion.mutualUids.slice(0, 3).map((uid) => {
+        const f = friends.find((fe) => fe.uid === uid);
+        return f?.handle ? `@${f.handle}` : null;
+      }).filter(Boolean) as string[];
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-cinema-card/60 border border-cinema-border/40">
+      {suggestion.handle ? (
+        <Link href={`/u/${suggestion.handle}`} className="relative w-12 h-12 rounded-full overflow-hidden bg-cinema-purple/30 flex items-center justify-center flex-shrink-0">
+          {suggestion.photoURL ? (
+            <Image src={suggestion.photoURL} alt={suggestion.displayName || suggestion.handle} fill sizes="48px" className="object-cover" unoptimized />
+          ) : (
+            <span className="text-sm font-bold text-white">{initials}</span>
+          )}
+        </Link>
+      ) : (
+        <div className="relative w-12 h-12 rounded-full overflow-hidden bg-cinema-purple/30 flex items-center justify-center flex-shrink-0">
+          {suggestion.photoURL ? (
+            <Image src={suggestion.photoURL} alt={suggestion.displayName || "user"} fill sizes="48px" className="object-cover" unoptimized />
+          ) : (
+            <span className="text-sm font-bold text-white">{initials}</span>
+          )}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        {suggestion.handle ? (
+          <Link href={`/u/${suggestion.handle}`} className="text-sm font-semibold text-cinema-text hover:text-cinema-purple truncate block">
+            {suggestion.displayName || `@${suggestion.handle}`}
+          </Link>
+        ) : (
+          <p className="text-sm font-semibold text-cinema-text truncate">{suggestion.displayName || "User"}</p>
+        )}
+        {suggestion.handle && suggestion.displayName && (
+          <p className="text-xs text-cinema-purple truncate">@{suggestion.handle}</p>
+        )}
+        <p className="text-[11px] text-cinema-muted mt-0.5">
+          {suggestion.mutualCount} mutual{suggestion.mutualCount === 1 ? "" : "s"}
+          {mutualHandles.length > 0 && ` · ${mutualHandles.join(", ")}`}
+          {suggestion.mutualCount > mutualHandles.length && ` +${suggestion.mutualCount - mutualHandles.length}`}
+        </p>
+      </div>
+      <button
+        onClick={handleAdd}
+        disabled={busy || sent}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 ${
+          sent
+            ? "bg-cinema-surface border border-cinema-border text-cinema-muted"
+            : "gradient-purple text-white"
+        }`}
+      >
+        <UserPlus className="w-3.5 h-3.5" />
+        {sent ? "Sent" : busy ? "..." : "Add"}
+      </button>
     </div>
   );
 }
