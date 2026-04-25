@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { Settings, User as UserIcon, LogOut } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 
 export default function UserMenu() {
@@ -45,17 +47,36 @@ export default function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-60 rounded-2xl glass-strong border border-cinema-border/50 shadow-2xl shadow-black/50 overflow-hidden animate-slide-down z-50">
+        <div className="absolute right-0 top-full mt-2 w-60 rounded-2xl glass-strong border border-cinema-border/50 depth-3 overflow-hidden animate-slide-down z-50">
           <div className="px-4 py-3 border-b border-cinema-border/30">
             <p className="text-sm font-semibold text-cinema-text truncate">{displayName}</p>
             {handle && <p className="text-xs text-cinema-purple truncate">@{handle}</p>}
             {user.email && <p className="text-xs text-cinema-muted truncate mt-0.5">{user.email}</p>}
           </div>
+
+          {handle && (
+            <Link
+              href={`/u/${handle}`}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-cinema-text hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <UserIcon className="w-4 h-4 text-cinema-muted" /> View profile
+            </Link>
+          )}
+
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-cinema-text hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            <Settings className="w-4 h-4 text-cinema-muted" /> Settings
+          </Link>
+
           <button
             onClick={async () => { setOpen(false); await signOut(); }}
-            className="w-full px-4 py-3 text-left text-sm text-cinema-red hover:bg-cinema-red/10 transition-colors cursor-pointer"
+            className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-cinema-red hover:bg-cinema-red/10 transition-colors cursor-pointer border-t border-cinema-border/30"
           >
-            Sign out
+            <LogOut className="w-4 h-4" /> Sign out
           </button>
         </div>
       )}

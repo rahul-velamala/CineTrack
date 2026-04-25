@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useApp } from "@/context/AppContext";
 import { validateHandle } from "@/lib/userStore";
 
+const SKIP_KEY = "cinetrack_handle_skip_session";
+
 export default function HandlePicker() {
-  const { needsHandle, claimHandle, signOut } = useApp();
+  const { needsHandle, claimHandle } = useApp();
   const [raw, setRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [skipped, setSkipped] = useState(true);
+
+  useEffect(() => {
+    try {
+      setSkipped(sessionStorage.getItem(SKIP_KEY) === "1");
+    } catch {
+      setSkipped(false);
+    }
+  }, []);
 
   const v = validateHandle(raw);
   const handlePreview = v.ok ? v.handle : raw.trim().toLowerCase().replace(/^@/, "");
@@ -29,9 +40,17 @@ export default function HandlePicker() {
     }
   };
 
+  const skip = () => {
+    try { sessionStorage.setItem(SKIP_KEY, "1"); } catch { /* ignore */ }
+    setSkipped(true);
+  };
+
+  // Show only when user has signed in AND has no handle AND hasn't skipped this session
+  const showing = needsHandle && !skipped;
+
   return (
     <AnimatePresence>
-      {needsHandle && (
+      {showing && (
         <motion.div
           key="handle-backdrop"
           initial={{ opacity: 0 }}
@@ -52,7 +71,7 @@ export default function HandlePicker() {
             <span className="text-3xl">🏷️</span>
           </div>
           <h2 className="text-xl font-bold font-[family-name:var(--font-display)]">Pick your handle</h2>
-          <p className="text-cinema-muted text-xs">Used by friends to find you. 3-20 chars. Letters, digits, underscores.</p>
+          <p className="text-cinema-muted text-xs">Friends use this to find you. 3-20 chars. Letters, digits, underscores. You can set it later in Settings.</p>
         </div>
 
         <div className="space-y-3">
@@ -87,10 +106,10 @@ export default function HandlePicker() {
           </button>
 
           <button
-            onClick={() => signOut()}
+            onClick={skip}
             className="w-full text-xs text-cinema-muted hover:text-cinema-text transition-colors cursor-pointer"
           >
-            Cancel & sign out
+            Set up later
           </button>
         </div>
           </motion.div>
