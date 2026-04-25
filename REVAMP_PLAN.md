@@ -328,7 +328,7 @@ Phase 0 needs zero console changes. Safe to start.
 | **9.1 — Guest data-loss UX + CLAUDE.md + Insta strategy** | ✅ done | `a86b011` |
 | **10a — Public profiles + Settings + non-blocking handle** | ✅ done | `9c00584` |
 | **10b — Friend discovery (preview, mutuals, invite tracking)** | ✅ done | `4ba39c7` |
-| **10c — Invite share + QR + bio-link page + OG + story sticker** | ✅ done | (this commit) |
+| **10c — Invite share + QR + bio-link page + OG + story sticker** | ✅ done | `8084829` |
 | **11 — Chat MVP (text + images)** | ⏳ planned | — |
 
 ---
