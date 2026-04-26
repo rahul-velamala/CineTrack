@@ -220,7 +220,13 @@ function dedupeMovies(...lists: Movie[][]): Movie[] {
       const key = `${m.mediaType ?? "movie"}-${m.imdbID}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ ...m, mediaType: m.mediaType ?? "movie" });
+      // Strip undefined fields — Firestore rejects them.
+      const cleaned: Record<string, unknown> = {};
+      const src = { ...m, mediaType: m.mediaType ?? "movie" } as Record<string, unknown>;
+      for (const k in src) {
+        if (src[k] !== undefined) cleaned[k] = src[k];
+      }
+      out.push(cleaned as unknown as Movie);
     }
   }
   return out;

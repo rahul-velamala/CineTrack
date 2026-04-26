@@ -88,6 +88,19 @@ function normalize(m: Movie): Movie {
   return { ...m, mediaType: m.mediaType ?? "movie" };
 }
 
+// Firestore rejects `undefined`. Strip undefined keys before writing.
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {};
+  for (const key in obj) {
+    if (obj[key] !== undefined) out[key] = obj[key];
+  }
+  return out as T;
+}
+
+function cleanMovieForFirestore(m: Movie): Movie {
+  return stripUndefined(m as unknown as Record<string, unknown>) as unknown as Movie;
+}
+
 function loadList(key: string): Movie[] {
   if (typeof window === "undefined") return [];
   try {
@@ -223,14 +236,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
     if (!user || !firestoreLoaded.current || isRemoteUpdate.current) return;
-    setDoc(doc(db, "users", user.uid), { watchlist }, { merge: true }).catch(console.error);
+    const cleaned = watchlist.map(cleanMovieForFirestore);
+    setDoc(doc(db, "users", user.uid), { watchlist: cleaned }, { merge: true }).catch(console.error);
   }, [watchlist, hydrated, user]);
 
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem(WATCHED_KEY, JSON.stringify(watched));
     if (!user || !firestoreLoaded.current || isRemoteUpdate.current) return;
-    setDoc(doc(db, "users", user.uid), { watched }, { merge: true }).catch(console.error);
+    const cleaned = watched.map(cleanMovieForFirestore);
+    setDoc(doc(db, "users", user.uid), { watched: cleaned }, { merge: true }).catch(console.error);
   }, [watched, hydrated, user]);
 
   // Keep ref in sync for callbacks
