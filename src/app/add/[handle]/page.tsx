@@ -19,6 +19,7 @@ import {
   computeMutuals,
 } from "@/lib/socialStore";
 import { capturePendingInvite } from "@/lib/inviteTracking";
+import { ensureChat, chatIdFor } from "@/lib/chatStore";
 
 export default function AddFriendPage() {
   const params = useParams();
@@ -266,12 +267,21 @@ export default function AddFriendPage() {
                     >
                       View profile
                     </Link>
-                    <Link
-                      href={`/u/${target.handle}`}
-                      className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm bg-cinema-purple/15 text-cinema-purple border border-cinema-purple/40 hover:bg-cinema-purple/25 transition-all"
+                    <button
+                      onClick={async () => {
+                        if (!profile) return;
+                        try {
+                          await ensureChat(profile, target);
+                          router.push(`/chat/${chatIdFor(profile.uid, target.uid)}`);
+                        } catch (err) {
+                          console.error(err);
+                          toast.error("Could not open chat.");
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm bg-cinema-purple/15 text-cinema-purple border border-cinema-purple/40 hover:bg-cinema-purple/25 transition-all cursor-pointer"
                     >
-                      <MessageSquare className="w-4 h-4" /> Send a rec
-                    </Link>
+                      <MessageSquare className="w-4 h-4" /> Message
+                    </button>
                   </div>
                   <button
                     onClick={handleUnfriend}

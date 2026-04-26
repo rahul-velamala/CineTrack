@@ -6,12 +6,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { UserPlus, Check, Hourglass, X, Lock } from "lucide-react";
+// MessageSquare imported below alongside chatStore
 import Navbar from "@/components/Navbar";
 import MovieCard from "@/components/MovieCard";
 import AuthModal from "@/components/AuthModal";
 import InviteShareCard from "@/components/InviteShareCard";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/components/Toast";
+import { useRouter } from "next/navigation";
+import { MessageSquare } from "lucide-react";
+import { ensureChat, chatIdFor } from "@/lib/chatStore";
 import { titleHref } from "@/lib/media";
 import { getUserProfileByHandle, type UserProfile } from "@/lib/userStore";
 import {
@@ -32,6 +36,7 @@ interface PublicData {
 
 export default function PublicProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const rawHandle = (params.handle as string).replace(/^@/, "");
   const { user, profile: selfProfile, friends } = useApp();
   const toast = useToast();
@@ -236,6 +241,22 @@ export default function PublicProfilePage() {
 
               <div className="mt-5 flex flex-wrap gap-2">
                 {friendButton}
+                {isFriend && selfProfile && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await ensureChat(selfProfile, p);
+                        router.push(`/chat/${chatIdFor(selfProfile.uid, p.uid)}`);
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Could not open chat.");
+                      }
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-cinema-purple/15 text-cinema-purple border border-cinema-purple/40 hover:bg-cinema-purple/25 transition-all cursor-pointer"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Message
+                  </button>
+                )}
                 {isSelf && (
                   <Link
                     href="/settings"

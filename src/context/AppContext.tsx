@@ -16,6 +16,7 @@ import {
   signOut as doSignOut,
 } from "@/lib/auth";
 import { subscribeFriends, subscribeInbox, type FriendEdge, type InboxRec } from "@/lib/socialStore";
+import { subscribeChats, totalUnread, type ChatDoc } from "@/lib/chatStore";
 import { attachInviteOnSignIn, captureInviteFromUrl } from "@/lib/inviteTracking";
 
 export type MediaType = "movie" | "tv";
@@ -63,6 +64,8 @@ interface AppContextType {
   inbox: InboxRec[];
   incomingCount: number;
   inboxCount: number;
+  chats: ChatDoc[];
+  chatUnread: number;
   // guest tracking
   guestAdds: number;
 }
@@ -125,6 +128,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [friends, setFriends] = useState<FriendEdge[]>([]);
   const [inbox, setInbox] = useState<InboxRec[]>([]);
+  const [chats, setChats] = useState<ChatDoc[]>([]);
   const [guestAdds, setGuestAdds] = useState(0);
 
   const isRemoteUpdate = useRef(false);
@@ -150,6 +154,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         setFriends([]);
         setInbox([]);
+        setChats([]);
         firestoreLoaded.current = false;
         migrated.current = false;
         return;
@@ -166,14 +171,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, []);
 
-  // Social subscriptions (friends + inbox) when authed
+  // Social subscriptions (friends + inbox + chats) when authed
   useEffect(() => {
     if (!user) return;
     const unsubFriends = subscribeFriends(user.uid, setFriends);
     const unsubInbox = subscribeInbox(user.uid, setInbox);
+    const unsubChats = subscribeChats(user.uid, setChats);
     return () => {
       unsubFriends();
       unsubInbox();
+      unsubChats();
     };
   }, [user]);
 
@@ -315,6 +322,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const needsHandle = !!user && !!profile && !profile.handle;
   const incomingCount = friends.filter((f) => f.status === "pending_in").length;
   const inboxCount = inbox.length;
+  const chatUnread = user ? totalUnread(chats, user.uid) : 0;
 
   if (!hydrated) {
     return (
@@ -348,6 +356,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         inbox,
         incomingCount,
         inboxCount,
+        chats,
+        chatUnread,
         guestAdds,
       }}
     >

@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Bookmark, Eye, Users, Inbox, Menu, X, Film } from "lucide-react";
+import { Search, Bookmark, Eye, Users, Inbox, Menu, X, Film, MessageSquare } from "lucide-react";
 import AuthModal from "./AuthModal";
 import HandlePicker from "./HandlePicker";
 import UserMenu from "./UserMenu";
 
 export default function Navbar() {
-  const { watchlist, watched, user, authLoading, incomingCount, inboxCount } = useApp();
+  const { watchlist, watched, user, authLoading, incomingCount, inboxCount, chatUnread } = useApp();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -31,6 +31,7 @@ export default function Navbar() {
   ];
   const authedLinks = [
     { href: "/friends", label: "Friends", count: incomingCount, Icon: Users },
+    { href: "/chat", label: "Chat", count: chatUnread, Icon: MessageSquare },
     { href: "/inbox", label: "Inbox", count: inboxCount, Icon: Inbox },
   ];
   const links = user ? [...baseLinks, ...authedLinks] : baseLinks;
