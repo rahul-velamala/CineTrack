@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { Tv, BookmarkPlus, BookmarkCheck, Check, X, Star, Eye } from "lucide-react";
 import { Movie, useApp } from "@/context/AppContext";
 import { titleHref } from "@/lib/media";
@@ -32,6 +32,7 @@ export default function MovieCard({ movie, variant, href }: MovieCardProps) {
   const rotateY = useTransform(xSpring, [-0.5, 0.5], [-8, 8]);
   const glareX = useTransform(xSpring, [-0.5, 0.5], ["80%", "20%"]);
   const glareY = useTransform(ySpring, [-0.5, 0.5], ["80%", "20%"]);
+  const glareBg = useMotionTemplate`radial-gradient(circle at ${glareX} ${glareY}, rgba(255,255,255,0.18), transparent 55%)`;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -66,12 +67,7 @@ export default function MovieCard({ movie, variant, href }: MovieCardProps) {
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          style={{
-            background: useTransform(
-              [glareX, glareY],
-              ([gx, gy]) => `radial-gradient(circle at ${gx} ${gy}, rgba(255,255,255,0.18), transparent 55%)`
-            ),
-          }}
+          style={{ background: glareBg }}
         />
 
         <div className="relative aspect-[2/3] overflow-hidden bg-cinema-surface">
