@@ -330,7 +330,7 @@ Phase 0 needs zero console changes. Safe to start.
 | **10b — Friend discovery (preview, mutuals, invite tracking)** | ✅ done | `4ba39c7` |
 | **10c — Invite share + QR + bio-link page + OG + story sticker** | ✅ done | `8084829` |
 | **10d — Direct add-friend deep link `/add/[handle]`** | ✅ done | `b39bb24` |
-| **11 — Chat MVP (text + images + recs)** | ✅ done | (this commit) |
+| **11 — Chat MVP (text + images + recs)** | ✅ done | `8a92a8c` |
 
 ---
 
